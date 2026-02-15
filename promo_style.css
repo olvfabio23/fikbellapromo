@@ -168,6 +168,7 @@ body {
     background: var(--gradient-main);
     position: relative;
     overflow: hidden;
+    text-align: center;
 }
 
 .qr-section::before,
@@ -902,12 +903,33 @@ body {
         gap: 20px;
     }
     
+    .qr-section {
+        padding: 60px 15px;
+    }
+    
     .qr-card {
         padding: 40px 20px;
+        width: 95%;
+        margin: 0 auto;
     }
     
     .qr-title {
         font-size: 1.8rem;
+    }
+    
+    .qr-container {
+        padding: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+    }
+    
+    #qrcode {
+        padding: 15px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
     
     .section-title {
@@ -979,6 +1001,46 @@ body {
     
     .ofertas-preview {
         grid-template-columns: 1fr;
+    }
+    
+    .qr-section {
+        padding: 40px 10px;
+    }
+    
+    .qr-card {
+        padding: 30px 15px;
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .qr-title {
+        font-size: 1.5rem;
+    }
+    
+    .qr-subtitle {
+        font-size: 1rem;
+    }
+    
+    .qr-container {
+        padding: 15px;
+        margin: 15px auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+    }
+    
+    #qrcode {
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    #qrcode canvas {
+        max-width: 100%;
+        height: auto !important;
+        width: auto !important;
     }
     
     .qr-card::before,

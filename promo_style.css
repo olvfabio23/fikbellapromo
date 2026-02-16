@@ -109,6 +109,7 @@ body {
 .logo-container {
     margin-bottom: var(--spacing-lg);
     animation: fadeInDown 0.8s ease;
+    text-align: center;
 }
 
 .logo-modern {
@@ -116,6 +117,7 @@ body {
     height: auto;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
     border-radius: 20px;
+    display: inline-block;
 }
 
 .hero-title-modern {
@@ -263,9 +265,12 @@ body {
     background: var(--white);
     padding: var(--spacing-lg);
     border-radius: 20px;
-    display: inline-block;
-    margin: var(--spacing-lg) 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: var(--spacing-lg) auto;
     border: 3px solid rgba(255, 107, 157, 0.3);
+    max-width: fit-content;
 }
 
 #qrcode {
@@ -295,6 +300,8 @@ body {
     margin: var(--spacing-lg) 0;
     color: var(--gray-600);
     font-weight: 500;
+    justify-content: center;
+    width: 100%;
 }
 
 .qr-divider::before,
@@ -366,7 +373,19 @@ body {
 
 .feature-highlight-section {
     padding: var(--spacing-2xl) 0;
-    background: var(--white);
+    background: linear-gradient(135deg, rgba(255, 107, 157, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+    position: relative;
+}
+
+.feature-highlight-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: radial-gradient(circle at 80% 20%, rgba(255, 107, 157, 0.1) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .feature-highlight-grid {
@@ -434,7 +453,19 @@ body {
 
 .why-choose-section {
     padding: var(--spacing-2xl) 0;
-    background: var(--gray-50);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(255, 107, 157, 0.06) 100%);
+    position: relative;
+}
+
+.why-choose-section::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 50%;
+    background: radial-gradient(ellipse at 20% 100%, rgba(255, 107, 157, 0.08) 0%, transparent 50%);
+    pointer-events: none;
 }
 
 .why-choose-grid {
@@ -504,7 +535,7 @@ body {
 
 .categories-section {
     padding: var(--spacing-2xl) 0;
-    background: var(--gray-50);
+    background: linear-gradient(135deg, rgba(255, 107, 157, 0.05) 0%, rgba(255, 107, 157, 0.02) 50%, rgba(139, 92, 246, 0.05) 100%);
 }
 
 .section-header-modern {
@@ -532,16 +563,17 @@ body {
 }
 
 .category-card {
-    background: var(--white);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 107, 157, 0.05) 100%);
     padding: var(--spacing-xl);
     border-radius: 25px;
     text-decoration: none;
     color: var(--gray-900);
     box-shadow: var(--shadow-md);
     transition: all 0.3s ease;
-    border: 2px solid rgba(255, 107, 157, 0.2);
+    border: 2px solid rgba(255, 107, 157, 0.3);
     position: relative;
     overflow: hidden;
+    backdrop-filter: blur(10px);
 }
 
 .category-card::before {
@@ -558,7 +590,9 @@ body {
 
 .category-card:hover {
     transform: translateY(-8px);
-    box-shadow: var(--shadow-xl);
+    box-shadow: 0 15px 40px rgba(255, 107, 157, 0.3);
+    border-color: var(--primary-purple);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(139, 92, 246, 0.12) 100%);
 }
 
 .category-card:hover::before {
@@ -598,7 +632,20 @@ body {
 
 .proof-section {
     padding: var(--spacing-2xl) 0;
-    background: var(--white);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(255, 107, 157, 0.1) 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.proof-section::before {
+    content: '';
+    position: absolute;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(255, 107, 157, 0.15) 0%, transparent 70%);
+    top: -250px;
+    right: -250px;
+    pointer-events: none;
 }
 
 .proof-grid {
@@ -610,10 +657,18 @@ body {
 .proof-card {
     text-align: center;
     padding: var(--spacing-xl) var(--spacing-md);
-    background: linear-gradient(135deg, rgba(255, 107, 157, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 107, 157, 0.12) 100%);
     border-radius: 20px;
-    border: 2px solid rgba(255, 107, 157, 0.2);
+    border: 2px solid rgba(255, 107, 157, 0.3);
     overflow: visible;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+}
+
+.proof-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(139, 92, 246, 0.25);
+    border-color: var(--primary-purple);
 }
 
 .proof-number {
@@ -640,7 +695,7 @@ body {
 
 .stores-section {
     padding: var(--spacing-2xl) 0;
-    background: var(--gray-50);
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.04) 0%, rgba(255, 107, 157, 0.08) 100%);
 }
 
 .stores-grid {
@@ -651,7 +706,7 @@ body {
 }
 
 .store-card {
-    background: var(--white);
+    background: linear-gradient(135deg, #ffffff 0%, rgba(255, 107, 157, 0.08) 100%);
     padding: var(--spacing-xl);
     border-radius: 20px;
     display: flex;
@@ -660,13 +715,15 @@ body {
     text-decoration: none;
     box-shadow: var(--shadow-md);
     transition: all 0.3s ease;
-    border: 2px solid rgba(255, 107, 157, 0.15);
+    border: 2px solid rgba(255, 107, 157, 0.25);
     min-height: 120px;
 }
 
 .store-card:hover {
     transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 12px 30px rgba(255, 107, 157, 0.3);
+    border-color: rgba(139, 92, 246, 0.4);
+    background: linear-gradient(135deg, #ffffff 0%, rgba(139, 92, 246, 0.1) 100%);
 }
 
 .store-logo {
@@ -733,7 +790,7 @@ body {
 
 .testimonials-section-modern {
     padding: var(--spacing-2xl) 0;
-    background: var(--white);
+    background: linear-gradient(180deg, rgba(255, 107, 157, 0.05) 0%, rgba(139, 92, 246, 0.08) 50%, rgba(255, 107, 157, 0.05) 100%);
 }
 
 .testimonials-grid-modern {
@@ -743,10 +800,18 @@ body {
 }
 
 .testimonial-card-modern {
-    background: var(--gray-50);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 107, 157, 0.08) 100%);
     padding: var(--spacing-xl);
     border-radius: 20px;
-    border: 2px solid rgba(255, 107, 157, 0.15);
+    border: 2px solid rgba(255, 107, 157, 0.25);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.testimonial-card-modern:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 30px rgba(139, 92, 246, 0.25);
+    border-color: var(--primary-purple);
 }
 
 .stars-modern {
@@ -945,6 +1010,24 @@ body {
         gap: var(--spacing-xl);
     }
     
+    .logo-container {
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+    
+    .hero-content-modern {
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .hero-features {
+        justify-content: center;
+    }
+    
     .hero-title-modern {
         font-size: 2.2rem;
     }
@@ -953,8 +1036,46 @@ body {
         font-size: 1.1rem;
     }
     
+    .qr-section-modern {
+        text-align: center;
+        padding: var(--spacing-xl) var(--spacing-md);
+    }
+    
+    .qr-card-modern {
+        margin: 0 auto;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .qr-header {
+        text-align: center;
+        width: 100%;
+    }
+    
+    .qr-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: var(--spacing-lg) auto;
+    }
+    
+    #qrcode,
+    #qrcode img {
+        display: block;
+        margin: 0 auto;
+    }
+    
+    .qrcode-img {
+        display: block;
+        margin: 0 auto !important;
+    }
+    
     .character-img {
         max-width: 350px;
+        display: block;
+        margin: 0 auto;
     }
     
     .discount-float {
@@ -972,6 +1093,13 @@ body {
     
     .cta-title-modern {
         font-size: 2rem;
+    }
+    
+    .btn-modern,
+    .btn-whatsapp-modern {
+        display: inline-block;
+        margin-left: auto;
+        margin-right: auto;
     }
     
     .instagram-content-modern {
@@ -1011,29 +1139,106 @@ body {
         padding: var(--spacing-xl) 0;
     }
     
+    .hero-content-modern {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .hero-features {
+        justify-content: center;
+        width: 100%;
+    }
+    
     .hero-title-modern {
         font-size: 1.8rem;
+        text-align: center;
+    }
+    
+    .hero-subtitle-modern {
+        text-align: center;
+    }
+    
+    .logo-container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
     }
     
     .logo-modern {
         width: 200px;
+        display: block;
+        margin: 0 auto;
     }
     
     .character-img {
         max-width: 280px;
+        display: block;
+        margin: 0 auto;
+    }
+    
+    .qr-section-modern {
+        text-align: center;
+        padding: var(--spacing-xl) var(--spacing-md);
     }
     
     .qr-card-modern {
         padding: var(--spacing-lg);
+        margin: 0 auto;
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .qr-header {
+        text-align: center;
+        width: 100%;
+    }
+    
+    .qr-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: var(--spacing-lg) auto;
+        width: 100%;
+    }
+    
+    #qrcode,
+    #qrcode img {
+        display: block;
+        margin: 0 auto;
+    }
+    
+    .qrcode-img {
+        width: 220px;
+        height: 220px;
+        display: block;
+        margin: 0 auto !important;
     }
     
     .qr-title-modern {
         font-size: 1.5rem;
+        text-align: center;
+    }
+    
+    .qr-subtitle-modern {
+        text-align: center;
     }
     
     .btn-modern {
         padding: 0.875rem 1.5rem;
         font-size: 1rem;
+        display: inline-block;
+        margin: 0 auto;
+    }
+    
+    .btn-whatsapp-modern {
+        display: inline-block;
+        margin: 0 auto;
     }
     
     .section-title-modern {

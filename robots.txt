@@ -1,5 +1,17 @@
 User-agent: *
 Allow: /
-Disallow: 
+Disallow: /static/preview_temp.png
+Disallow: /__pycache__/
 
+# Permitir rastreamento de todos os arquivos importantes
+Allow: /index.html
+Allow: /promo_style.css
+Allow: /promo_script.js
+Allow: /static/
+Allow: /sitemap.xml
+
+# Velocidade de rastreamento (respeitosa)
+Crawl-delay: 1
+
+# Sitemap
 Sitemap: https://www.fikbellapromo.com.br/sitemap.xml

@@ -7,9 +7,16 @@ import os
 import json
 from datetime import datetime, timedelta
 import re
-from scraper import ProductScraper
-from flyer_generator import FlyerGenerator
 from flask_sqlalchemy import SQLAlchemy
+
+try:
+    from scraper import ProductScraper
+    from flyer_generator import FlyerGenerator
+    FLYER_MODULES_AVAILABLE = True
+except ModuleNotFoundError:
+    ProductScraper = None
+    FlyerGenerator = None
+    FLYER_MODULES_AVAILABLE = False
 
 app = Flask(__name__)
 app.secret_key = 'fikbella_promo_secret_key_2024'
@@ -114,6 +121,22 @@ def limpar_promocoes_expiradas():
 
 def init_promotions_db():
     db.create_all()
+
+
+def ensure_flyer_modules_or_raise_json():
+    if not FLYER_MODULES_AVAILABLE:
+        return jsonify({
+            'success': False,
+            'error': 'Módulo de flyers não disponível neste deploy.'
+        }), 503
+    return None
+
+
+def ensure_flyer_modules_or_redirect():
+    if not FLYER_MODULES_AVAILABLE:
+        flash('⚠️ Módulo de flyers não disponível neste deploy.', 'warning')
+        return redirect(url_for('index'))
+    return None
 
 
 if AUTO_INIT_DB:
@@ -258,6 +281,10 @@ def cleanup_promocoes_api():
 @app.route('/generate', methods=['POST'])
 def generate_flyer():
     """Processa o formulário e mostra prévia"""
+    unavailable_response = ensure_flyer_modules_or_redirect()
+    if unavailable_response:
+        return unavailable_response
+
     try:
         # Obter dados do formulário
         platform = request.form.get('platform')
@@ -334,6 +361,10 @@ def generate_flyer():
 @app.route('/update_preview', methods=['POST'])
 def update_preview():
     """Atualiza a prévia quando o usuário edita dados"""
+    unavailable_response = ensure_flyer_modules_or_raise_json()
+    if unavailable_response:
+        return unavailable_response
+
     try:
         # Obter dados editados via JSON
         data = request.get_json()
@@ -395,6 +426,10 @@ def update_preview():
 @app.route('/generate_final', methods=['POST'])
 def generate_final():
     """Gera o flyer final após edições na prévia"""
+    unavailable_response = ensure_flyer_modules_or_redirect()
+    if unavailable_response:
+        return unavailable_response
+
     try:
         # Obter dados editados
         name = request.form.get('name')
@@ -454,6 +489,10 @@ def generate_final():
 @app.route('/generate_manual', methods=['POST'])
 def generate_manual():
     """Gera prévia com dados inseridos manualmente (Shopee)"""
+    unavailable_response = ensure_flyer_modules_or_redirect()
+    if unavailable_response:
+        return unavailable_response
+
     try:
         # Obter dados do formulário manual
         name = request.form.get('name').strip()

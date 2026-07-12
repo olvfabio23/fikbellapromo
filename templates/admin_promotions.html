@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Admin - Promocoes</title>
+    <style>
+        :root {
+            --bg: #f6f6fb;
+            --panel: #ffffff;
+            --ink: #1d2130;
+            --muted: #6b7388;
+            --line: #e1e6f1;
+            --accent: #2f55d4;
+            --danger: #be2d2d;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "Trebuchet MS", Verdana, sans-serif;
+            color: var(--ink);
+            background: linear-gradient(160deg, #f9f7ff 0%, #f1f7ff 55%, #f7f9ef 100%);
+        }
+
+        .wrap {
+            width: min(1100px, calc(100% - 2rem));
+            margin: 1.8rem auto;
+            display: grid;
+            gap: 1rem;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 1rem;
+        }
+
+        h1, h2 { margin: 0; }
+
+        .subtitle {
+            margin-top: 0.4rem;
+            color: var(--muted);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.8rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        input {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 0.65rem 0.7rem;
+            font-size: 0.95rem;
+        }
+
+        .full { grid-column: 1 / -1; }
+
+        .actions {
+            margin-top: 0.8rem;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 10px;
+            padding: 0.65rem 0.9rem;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .primary { background: var(--accent); color: #fff; }
+        .ghost { background: #eef2ff; color: #243167; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            border-bottom: 1px solid var(--line);
+            text-align: left;
+            padding: 0.6rem 0.3rem;
+            vertical-align: top;
+        }
+
+        .danger {
+            color: #fff;
+            background: var(--danger);
+            padding: 0.45rem 0.6rem;
+            border-radius: 8px;
+        }
+
+        .hint {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin: 0;
+        }
+
+        @media (max-width: 840px) {
+            .grid { grid-template-columns: 1fr; }
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tr {
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                margin-bottom: 0.7rem;
+                padding: 0.4rem;
+                background: #fff;
+            }
+            td { border: 0; padding: 0.35rem 0.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="panel">
+            <h1>Painel de Promocoes</h1>
+            <p class="subtitle">Validade automatica de {{ ttl_dias }} dias por promocao.</p>
+        </section>
+
+        <section class="panel">
+            <h2>Nova promocao</h2>
+            <form id="form-promocao">
+                <div class="grid">
+                    <div>
+                        <label for="titulo">Titulo</label>
+                        <input id="titulo" name="titulo" required>
+                    </div>
+                    <div>
+                        <label for="preco">Preco</label>
+                        <input id="preco" name="preco" placeholder="Ex: R$ 199,90" required>
+                    </div>
+                    <div class="full">
+                        <label for="imagem">URL da imagem</label>
+                        <input id="imagem" name="imagem" type="url" required>
+                    </div>
+                    <div class="full">
+                        <label for="link_afiliado">Link de afiliado</label>
+                        <input id="link_afiliado" name="link_afiliado" type="url" required>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="primary" type="submit">Salvar promocao</button>
+                    <button class="ghost" type="button" id="btn-cleanup">Executar limpeza agora</button>
+                </div>
+            </form>
+            <p id="msg" class="hint"></p>
+        </section>
+
+        <section class="panel">
+            <h2>Promocoes cadastradas</h2>
+            <p class="hint">Use a API para integrações externas: /api/promocoes</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Titulo</th>
+                        <th>Preco</th>
+                        <th>Publicacao</th>
+                        <th>Expira em</th>
+                        <th>Cliques</th>
+                        <th>Acao</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-promocoes">
+                    {% for p in promocoes %}
+                        <tr data-id="{{ p.id }}">
+                            <td>{{ p.id }}</td>
+                            <td>{{ p.titulo }}</td>
+                            <td>{{ p.preco }}</td>
+                            <td>{{ p.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ p.expira_em.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ p.total_cliques }}</td>
+                            <td><button class="danger" onclick="excluir({{ p.id }})">Excluir</button></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const token = new URLSearchParams(window.location.search).get('token') || '';
+        const msgEl = document.getElementById('msg');
+
+        function setMsg(texto) {
+            msgEl.textContent = texto;
+        }
+
+        async function excluir(id) {
+            if (!confirm('Excluir promocao ' + id + '?')) {
+                return;
+            }
+
+            const resp = await fetch('/api/admin/promocoes/' + id + '?token=' + encodeURIComponent(token), {
+                method: 'DELETE'
+            });
+
+            if (!resp.ok) {
+                setMsg('Falha ao excluir promocao. Verifique o token.');
+                return;
+            }
+
+            const row = document.querySelector('tr[data-id="' + id + '"]');
+            if (row) {
+                row.remove();
+            }
+            setMsg('Promocao excluida com sucesso.');
+        }
+
+        document.getElementById('form-promocao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            formData.append('token', token);
+
+            const resp = await fetch('/api/admin/promocoes', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!resp.ok) {
+                const erro = await resp.json().catch(() => ({ erro: 'Falha ao salvar promocao.' }));
+                setMsg(erro.erro || 'Falha ao salvar promocao.');
+                return;
+            }
+
+            setMsg('Promocao cadastrada com sucesso. Recarregando...');
+            window.location.reload();
+        });
+
+        document.getElementById('btn-cleanup').addEventListener('click', async () => {
+            const resp = await fetch('/api/admin/promocoes/cleanup?token=' + encodeURIComponent(token), {
+                method: 'POST'
+            });
+
+            if (!resp.ok) {
+                setMsg('Falha ao executar limpeza.');
+                return;
+            }
+
+            const data = await resp.json();
+            setMsg('Limpeza concluida. Removidas: ' + data.removidas);
+            window.location.reload();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+
+# Flask/local
+instance/
+*.db
+*.sqlite3
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Runtime outputs
+output/
+static/preview_temp.png
+temp_*.jpg
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/

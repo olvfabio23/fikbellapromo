@@ -8,6 +8,7 @@ import json
 from datetime import datetime, timedelta
 import re
 from flask_sqlalchemy import SQLAlchemy
+from jinja2 import TemplateNotFound
 
 try:
     from scraper import ProductScraper
@@ -175,12 +176,18 @@ def save_coupon(name, discount):
 def index():
     """Página inicial com formulário"""
     saved_coupons = load_coupons()
-    return render_template('index.html', saved_coupons=saved_coupons)
+    try:
+        return render_template('index.html', saved_coupons=saved_coupons)
+    except TemplateNotFound:
+        return redirect(url_for('vitrine_promocoes'))
 
 @app.route('/calculadora-trabalhista')
 def calculadora_trabalhista():
     """Página com cálculos trabalhistas"""
-    return render_template('calculadora_trabalhista.html')
+    try:
+        return render_template('calculadora_trabalhista.html')
+    except TemplateNotFound:
+        return redirect(url_for('vitrine_promocoes'))
 
 @app.route('/api/coupons')
 def get_coupons():

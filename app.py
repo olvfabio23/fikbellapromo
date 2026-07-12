@@ -7,6 +7,8 @@ import os
 import json
 from datetime import datetime, timedelta
 import re
+import requests
+from bs4 import BeautifulSoup
 from flask_sqlalchemy import SQLAlchemy
 from jinja2 import TemplateNotFound
 
@@ -95,6 +97,124 @@ def validar_admin_token():
     token = request.headers.get('X-Admin-Token') or request.args.get('token') or request.form.get('token')
     if token != ADMIN_TOKEN:
         abort(401, description='Token administrativo inválido.')
+
+
+def _get_meta_content(soup, selector):
+    tag = soup.select_one(selector)
+    if not tag:
+        return ''
+    return (tag.get('content') or '').strip()
+
+
+def _formatar_preco(preco_bruto):
+    preco_bruto = (preco_bruto or '').strip()
+    if not preco_bruto:
+        return ''
+
+    if preco_bruto.lower().startswith('r$'):
+        return preco_bruto
+
+    match = re.search(r'(\d{1,3}(?:[\.\s]\d{3})*(?:,\d{2})|\d+(?:[\.,]\d{2})?)', preco_bruto)
+    if not match:
+        return preco_bruto
+
+    valor = match.group(1).replace(' ', '')
+    if ',' not in valor and '.' in valor:
+        partes = valor.split('.')
+        if len(partes[-1]) == 2:
+            valor = ','.join(['.'.join(partes[:-1]), partes[-1]])
+    return f'R$ {valor}'
+
+
+def _extrair_do_json_ld(soup):
+    titulo = ''
+    preco = ''
+    imagem = ''
+
+    scripts = soup.select('script[type="application/ld+json"]')
+    for script in scripts:
+        conteudo = (script.string or script.get_text() or '').strip()
+        if not conteudo:
+            continue
+
+        try:
+            data = json.loads(conteudo)
+        except Exception:
+            continue
+
+        pilha = [data]
+        while pilha:
+            atual = pilha.pop()
+            if isinstance(atual, list):
+                pilha.extend(atual)
+                continue
+
+            if not isinstance(atual, dict):
+                continue
+
+            tipo = str(atual.get('@type', '')).lower()
+            if tipo == 'product' or ('product' in tipo):
+                if not titulo:
+                    titulo = str(atual.get('name') or '').strip()
+
+                if not imagem:
+                    img = atual.get('image')
+                    if isinstance(img, list) and img:
+                        imagem = str(img[0]).strip()
+                    elif isinstance(img, str):
+                        imagem = img.strip()
+
+                offers = atual.get('offers')
+                if isinstance(offers, list) and offers:
+                    offers = offers[0]
+                if isinstance(offers, dict) and not preco:
+                    preco = str(offers.get('price') or '').strip()
+
+            pilha.extend([v for v in atual.values() if isinstance(v, (dict, list))])
+
+    return titulo, preco, imagem
+
+
+def extrair_dados_produto(product_url):
+    headers = {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/126.0.0.0 Safari/537.36'
+        )
+    }
+    resposta = requests.get(product_url, headers=headers, timeout=20)
+    resposta.raise_for_status()
+
+    soup = BeautifulSoup(resposta.text, 'lxml')
+
+    titulo = (
+        _get_meta_content(soup, 'meta[property="og:title"]')
+        or _get_meta_content(soup, 'meta[name="twitter:title"]')
+        or (soup.title.get_text(strip=True) if soup.title else '')
+    )
+    imagem = (
+        _get_meta_content(soup, 'meta[property="og:image"]')
+        or _get_meta_content(soup, 'meta[name="twitter:image"]')
+    )
+    preco = (
+        _get_meta_content(soup, 'meta[property="product:price:amount"]')
+        or _get_meta_content(soup, 'meta[property="og:price:amount"]')
+        or _get_meta_content(soup, 'meta[itemprop="price"]')
+    )
+
+    if not (titulo and imagem and preco):
+        jsonld_titulo, jsonld_preco, jsonld_imagem = _extrair_do_json_ld(soup)
+        titulo = titulo or jsonld_titulo
+        preco = preco or jsonld_preco
+        imagem = imagem or jsonld_imagem
+
+    return {
+        'titulo': titulo,
+        'preco': _formatar_preco(preco),
+        'imagem': imagem,
+        'link_afiliado': product_url,
+    }
 
 
 def buscar_promocoes_ativas():
@@ -268,6 +388,27 @@ def criar_promocao():
     db.session.commit()
 
     return jsonify({'ok': True, 'promocao': promocao.to_dict()}), 201
+
+
+@app.route('/api/admin/promocoes/extract', methods=['POST'])
+def extrair_promocao_por_link():
+    validar_admin_token()
+    payload = request.get_json(silent=True) or request.form
+    product_url = (payload.get('product_url') or payload.get('url') or '').strip()
+
+    if not product_url:
+        return jsonify({'erro': 'Campo obrigatório: product_url.'}), 400
+
+    try:
+        dados = extrair_dados_produto(product_url)
+    except requests.RequestException as exc:
+        return jsonify({'erro': f'Falha ao acessar URL: {exc}'}), 502
+
+    faltantes = [
+        campo for campo in ('titulo', 'preco', 'imagem') if not (dados.get(campo) or '').strip()
+    ]
+
+    return jsonify({'ok': True, 'dados': dados, 'campos_faltantes': faltantes})
 
 
 @app.route('/api/admin/promocoes/<int:promocao_id>', methods=['DELETE'])

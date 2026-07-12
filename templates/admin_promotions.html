@@ -138,6 +138,10 @@
             <h2>Nova promocao</h2>
             <form id="form-promocao">
                 <div class="grid">
+                    <div class="full">
+                        <label for="product_url">Link do produto (autopreencher)</label>
+                        <input id="product_url" name="product_url" type="url" placeholder="Cole o link do produto e clique em Preencher pelo link">
+                    </div>
                     <div>
                         <label for="titulo">Titulo</label>
                         <input id="titulo" name="titulo" required>
@@ -156,6 +160,7 @@
                     </div>
                 </div>
                 <div class="actions">
+                    <button class="ghost" type="button" id="btn-autofill">Preencher pelo link</button>
                     <button class="primary" type="submit">Salvar promocao</button>
                     <button class="ghost" type="button" id="btn-cleanup">Executar limpeza agora</button>
                 </div>
@@ -242,6 +247,51 @@
 
             setMsg('Promocao cadastrada com sucesso. Recarregando...');
             window.location.reload();
+        });
+
+        document.getElementById('btn-autofill').addEventListener('click', async () => {
+            const productUrl = document.getElementById('product_url').value.trim();
+            if (!productUrl) {
+                setMsg('Informe o link do produto para autopreencher.');
+                return;
+            }
+
+            setMsg('Lendo dados do produto...');
+            const formData = new FormData();
+            formData.append('product_url', productUrl);
+            formData.append('token', token);
+
+            const resp = await fetch('/api/admin/promocoes/extract', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await resp.json().catch(() => ({}));
+
+            if (!resp.ok || !data.ok) {
+                setMsg((data && data.erro) ? data.erro : 'Falha ao extrair dados do produto.');
+                return;
+            }
+
+            const dados = data.dados || {};
+            if (dados.titulo) {
+                document.getElementById('titulo').value = dados.titulo;
+            }
+            if (dados.preco) {
+                document.getElementById('preco').value = dados.preco;
+            }
+            if (dados.imagem) {
+                document.getElementById('imagem').value = dados.imagem;
+            }
+            if (dados.link_afiliado) {
+                document.getElementById('link_afiliado').value = dados.link_afiliado;
+            }
+
+            if (Array.isArray(data.campos_faltantes) && data.campos_faltantes.length) {
+                setMsg('Extraido parcialmente. Complete os campos: ' + data.campos_faltantes.join(', '));
+            } else {
+                setMsg('Dados extraidos com sucesso. Revise e salve a promocao.');
+            }
         });
 
         document.getElementById('btn-cleanup').addEventListener('click', async () => {

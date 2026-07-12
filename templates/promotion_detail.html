@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ promocao.titulo }} - Fikbella</title>
+    <style>
+        :root {
+            --bg: #f4f7f1;
+            --panel: #ffffff;
+            --ink: #1e241e;
+            --muted: #647267;
+            --brand: #2d7a5e;
+            --brand-strong: #1f624a;
+            --line: #dbe7dc;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Cambria, Georgia, serif;
+            background:
+                linear-gradient(180deg, #eef8ef 0%, rgba(238, 248, 239, 0) 38%),
+                radial-gradient(circle at 90% 10%, #dff0e1 0%, rgba(223, 240, 225, 0) 40%),
+                var(--bg);
+            color: var(--ink);
+        }
+
+        .wrap {
+            width: min(1000px, calc(100% - 2rem));
+            margin: 2rem auto;
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: 0 8px 26px rgba(31, 52, 36, 0.07);
+            overflow: hidden;
+        }
+
+        .media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            aspect-ratio: 1 / 1;
+        }
+
+        .content {
+            padding: 1.2rem;
+            display: grid;
+            gap: 0.9rem;
+            align-content: start;
+        }
+
+        h1 {
+            margin: 0;
+            line-height: 1.25;
+            font-size: clamp(1.4rem, 2.4vw, 2rem);
+        }
+
+        .price {
+            margin: 0;
+            color: var(--brand-strong);
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        .meta {
+            color: var(--muted);
+            font-size: 0.92rem;
+            margin: 0;
+        }
+
+        .cta {
+            display: inline-block;
+            text-decoration: none;
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            background: var(--brand);
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .back {
+            text-decoration: none;
+            color: var(--ink);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 0.6rem 0.8rem;
+            display: inline-block;
+        }
+
+        @media (max-width: 760px) {
+            .wrap {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="wrap">
+        <section class="card media">
+            <img src="{{ promocao.imagem }}" alt="{{ promocao.titulo }}">
+        </section>
+
+        <section class="card content">
+            <h1>{{ promocao.titulo }}</h1>
+            <p class="price">{{ promocao.preco }}</p>
+            <p class="meta">Publicada em {{ promocao.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</p>
+            <p class="meta">Expira em {{ promocao.expira_em.strftime('%d/%m/%Y %H:%M') }}</p>
+            <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}">Ir para oferta afiliada</a>
+            <a class="back" href="{{ url_for('vitrine_promocoes') }}">Voltar para vitrine</a>
+        </section>
+    </main>
+</body>
+</html>

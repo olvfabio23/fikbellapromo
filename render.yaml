@@ -1,0 +1,81 @@
+services:
+  - type: web
+    name: fikbellapromo-web
+    runtime: python
+    plan: starter
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: PROMOTION_TTL_DAYS
+        value: 5
+      - key: PROMOTION_TABLE_NAME
+        value: fikbella_promocoes
+      - key: PROMOTION_DB_SCHEMA
+        sync: false
+      - key: AUTO_INIT_DB
+        value: true
+      - key: API_BASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: WHATSAPP_WEBHOOK_URL
+        sync: false
+      - key: FACEBOOK_WEBHOOK_URL
+        sync: false
+
+  - type: cron
+    name: fikbellapromo-cleanup
+    runtime: python
+    schedule: "0 3 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/cleanup_expired_promotions.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: PROMOTION_TTL_DAYS
+        value: 5
+      - key: PROMOTION_TABLE_NAME
+        value: fikbella_promocoes
+      - key: PROMOTION_DB_SCHEMA
+        sync: false
+      - key: AUTO_INIT_DB
+        value: true
+
+  - type: cron
+    name: fikbellapromo-distribute
+    runtime: python
+    schedule: "0 */6 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/distribute_promotions.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ADMIN_TOKEN
+        sync: false
+      - key: PROMOTION_TTL_DAYS
+        value: 5
+      - key: PROMOTION_TABLE_NAME
+        value: fikbella_promocoes
+      - key: PROMOTION_DB_SCHEMA
+        sync: false
+      - key: AUTO_INIT_DB
+        value: true
+      - key: API_BASE_URL
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: WHATSAPP_WEBHOOK_URL
+        sync: false
+      - key: FACEBOOK_WEBHOOK_URL
+        sync: false

@@ -31,6 +31,15 @@ Use um comando WSGI padrao, por exemplo:
 
 `gunicorn app:app`
 
+## 2.1) Versao do Python (obrigatorio)
+
+Este projeto usa `runtime.txt` para fixar Python 3.11 e evitar erro de build do Pillow em Python 3.14.
+
+- Arquivo: `runtime.txt`
+- Conteudo: `python-3.11.11`
+
+Se necessario, voce pode reforcar no Render com a variavel `PYTHON_VERSION=3.11.11`.
+
 Opcional antes do primeiro deploy (uma vez):
 
 `python scripts/init_promotions_db.py`

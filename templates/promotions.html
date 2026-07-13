@@ -93,6 +93,39 @@
             white-space: nowrap;
         }
 
+        .stores-bar {
+            display: flex;
+            gap: 0.7rem;
+            flex-wrap: wrap;
+        }
+
+        .store-filter {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            text-decoration: none;
+            color: var(--ink);
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 0.4rem 0.7rem 0.4rem 0.4rem;
+            font-weight: 700;
+        }
+
+        .store-filter.active {
+            border-color: var(--violet);
+            box-shadow: 0 0 0 3px rgba(184, 138, 216, 0.12);
+        }
+
+        .store-filter img {
+            width: 34px;
+            height: 34px;
+            object-fit: cover;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            background: #fff;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -127,12 +160,23 @@
             top: 0.6rem;
             margin: 0;
             border-radius: 999px;
-            padding: 0.22rem 0.55rem;
+            padding: 0.22rem 0.4rem;
             background: rgba(255, 255, 255, 0.95);
             border: 1px solid #e0d3ef;
             color: #5f3f85;
             font-size: 0.78rem;
             font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            text-decoration: none;
+        }
+
+        .store-chip img {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            object-fit: cover;
         }
 
         .body {
@@ -245,13 +289,31 @@
             <a href="{{ whatsapp_group_url }}" target="_blank" rel="noopener">Entrar no WhatsApp</a>
         </section>
 
+        {% if lojas %}
+            <section class="stores-bar">
+                <a class="store-filter {% if not loja_atual %}active{% endif %}" href="{{ url_for('vitrine_promocoes') }}">
+                    <span>✨</span>
+                    <span>Todas</span>
+                </a>
+                {% for loja in lojas %}
+                    <a class="store-filter {% if loja_atual and loja.slug == loja_atual.slug %}active{% endif %}" href="{{ url_for('promocoes_por_loja', loja_slug=loja.slug) }}">
+                        {% if loja.logo_url %}<img src="{{ loja.logo_url }}" alt="{{ loja.nome }}">{% else %}<span>{{ loja.simbolo }}</span>{% endif %}
+                        <span>{{ loja.nome }}</span>
+                    </a>
+                {% endfor %}
+            </section>
+        {% endif %}
+
         {% if promocoes %}
             <section class="grid">
                 {% for promocao in promocoes %}
                     <article class="card">
                         <div class="media-wrap">
                             <img src="{{ promocao.imagem }}" alt="{{ promocao.titulo }}" loading="lazy">
-                            <p class="store-chip">{{ promocao.loja_simbolo }} {{ promocao.loja_nome }}</p>
+                            <a class="store-chip" href="{{ url_for('promocoes_por_loja', loja_slug=promocao.loja_slug) }}">
+                                {% if promocao.loja_logo_url %}<img src="{{ promocao.loja_logo_url }}" alt="{{ promocao.loja_nome }}">{% else %}<span>{{ promocao.loja_simbolo }}</span>{% endif %}
+                                <span>{{ promocao.loja_nome }}</span>
+                            </a>
                         </div>
 
                         <div class="body">

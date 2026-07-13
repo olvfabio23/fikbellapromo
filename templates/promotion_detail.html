@@ -89,6 +89,18 @@
             font-size: 0.8rem;
             font-weight: 700;
             padding: 0.25rem 0.55rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            text-decoration: none;
+        }
+
+        .store img {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            object-fit: cover;
+            border: 1px solid var(--line);
         }
 
         .old-price {
@@ -198,7 +210,10 @@
         </section>
 
         <aside class="panel side">
-            <p class="store">{{ promocao.loja_simbolo }} Promocao de loja: {{ promocao.loja_nome }}</p>
+            <a class="store" href="{{ url_for('promocoes_por_loja', loja_slug=promocao.loja_slug) }}">
+                {% if promocao.loja_logo_url %}<img src="{{ promocao.loja_logo_url }}" alt="{{ promocao.loja_nome }}">{% else %}<span>{{ promocao.loja_simbolo }}</span>{% endif %}
+                <span>Promocao de loja: {{ promocao.loja_nome }}</span>
+            </a>
 
             {% if promocao.preco_original and promocao.preco_original != promocao.preco_final %}
                 <p class="old-price">{{ promocao.preco_original }}</p>

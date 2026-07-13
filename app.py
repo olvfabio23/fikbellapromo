@@ -137,6 +137,21 @@ def extrair_loja_nome(link):
     return 'Loja parceira'
 
 
+def extrair_loja_slug(link):
+    nome = extrair_loja_nome(link).lower()
+    mapa = {
+        'mercado livre': 'mercado-livre',
+        'shopee': 'shopee',
+        'amazon': 'amazon',
+        'magalu': 'magalu',
+        'aliexpress': 'aliexpress',
+        'shein': 'shein',
+        'netshoes': 'netshoes',
+        'centauro': 'centauro',
+    }
+    return mapa.get(nome, slugify(nome))
+
+
 def extrair_loja_simbolo(link):
     try:
         host = (urlparse(link).netloc or '').lower().replace('www.', '')
@@ -158,6 +173,64 @@ def extrair_loja_simbolo(link):
         if chave in host:
             return simbolo
     return '🛍️'
+
+
+def extrair_loja_logo(link):
+    host = ''
+    try:
+        host = (urlparse(link).netloc or '').lower().replace('www.', '')
+    except Exception:
+        pass
+
+    mapa = {
+        'mercadolivre': 'mercado_livre.png',
+        'shopee': 'shopee.png',
+        'magazineluiza': 'Magalu.png',
+        'magalu': 'Magalu.png',
+        'amazon': 'Amazon.jpg',
+    }
+    for chave, arquivo in mapa.items():
+        if chave in host:
+            return url_for('static', filename=arquivo)
+    return ''
+
+
+def montar_meta_loja(link):
+    return {
+        'nome': extrair_loja_nome(link),
+        'slug': extrair_loja_slug(link),
+        'simbolo': extrair_loja_simbolo(link),
+        'logo_url': extrair_loja_logo(link),
+    }
+
+
+def titulo_do_path_url(product_url):
+    try:
+        path = urlparse(product_url).path.strip('/')
+    except Exception:
+        return ''
+
+    if not path:
+        return ''
+
+    parts = [part for part in path.split('/') if part]
+    if not parts:
+        return ''
+
+    candidatos = []
+    for part in parts:
+        if re.search(r'[a-zA-Z]', part) and not re.fullmatch(r'[0-9]+', part):
+            candidatos.append(part)
+
+    if not candidatos:
+        return ''
+
+    bruto = max(candidatos, key=len)
+    bruto = re.sub(r'[-_]+', ' ', bruto)
+    bruto = re.sub(r'\s+', ' ', bruto).strip()
+    if len(bruto) < 4:
+        return ''
+    return bruto.title()
 
 
 def _normalize_url(product_url):
@@ -538,7 +611,13 @@ def extrair_dados_produto(product_url):
         preco_original_fmt = preco_atual_fmt
 
     if not titulo and final_url:
+        titulo = titulo_do_path_url(final_url)
+    if not titulo and product_url:
+        titulo = titulo_do_path_url(product_url)
+    if not titulo and final_url:
         titulo = f'Oferta {extrair_loja_nome(final_url)}'
+
+    loja_meta = montar_meta_loja(final_url or product_url)
 
     return {
         'titulo': titulo,
@@ -547,8 +626,10 @@ def extrair_dados_produto(product_url):
         'preco_original': preco_original_fmt,
         'imagem': imagem,
         'link_afiliado': final_url or product_url,
-        'loja_nome': extrair_loja_nome(final_url or product_url),
-        'loja_simbolo': extrair_loja_simbolo(final_url or product_url),
+        'loja_nome': loja_meta['nome'],
+        'loja_simbolo': loja_meta['simbolo'],
+        'loja_slug': loja_meta['slug'],
+        'loja_logo_url': loja_meta['logo_url'],
     }
 
 
@@ -652,23 +733,71 @@ def get_coupons():
 
 @app.route('/promocoes')
 def vitrine_promocoes():
+    promocoes = montar_promocoes_view(buscar_promocoes_ativas())
+    lojas = montar_lojas_disponiveis(promocoes)
+    return render_template(
+        'promotions.html',
+        promocoes=promocoes,
+        lojas=lojas,
+        loja_atual=None,
+        whatsapp_group_url=WHATSAPP_GROUP_URL,
+    )
+
+
+def montar_promocoes_view(promocoes_db):
     promocoes = []
-    for promo in buscar_promocoes_ativas():
+    for promo in promocoes_db:
         info = parse_preco_info(promo.preco)
+        loja_meta = montar_meta_loja(promo.link_afiliado)
         promocoes.append({
             'id': promo.id,
             'titulo': promo.titulo,
             'imagem': promo.imagem,
             'slug': promo.slug,
-            'loja_nome': extrair_loja_nome(promo.link_afiliado),
-            'loja_simbolo': extrair_loja_simbolo(promo.link_afiliado),
+            'loja_nome': loja_meta['nome'],
+            'loja_slug': loja_meta['slug'],
+            'loja_simbolo': loja_meta['simbolo'],
+            'loja_logo_url': loja_meta['logo_url'],
             'data_publicacao': promo.data_publicacao,
             'preco_final': info['preco_final'],
             'preco_original': info['preco_original'],
             'desconto_texto': info['desconto_texto'],
             'cupom_nome': info['cupom_nome'],
         })
-    return render_template('promotions.html', promocoes=promocoes, whatsapp_group_url=WHATSAPP_GROUP_URL)
+    return promocoes
+
+
+def montar_lojas_disponiveis(promocoes):
+    lojas = {}
+    for promo in promocoes:
+        slug = promo['loja_slug']
+        if slug not in lojas:
+            lojas[slug] = {
+                'slug': slug,
+                'nome': promo['loja_nome'],
+                'simbolo': promo['loja_simbolo'],
+                'logo_url': promo['loja_logo_url'],
+            }
+    return list(lojas.values())
+
+
+@app.route('/promocoes/loja/<loja_slug>')
+def promocoes_por_loja(loja_slug):
+    promocoes = montar_promocoes_view(buscar_promocoes_ativas())
+    lojas = montar_lojas_disponiveis(promocoes)
+    filtradas = [promo for promo in promocoes if promo['loja_slug'] == loja_slug]
+    loja_atual = next((loja for loja in lojas if loja['slug'] == loja_slug), None)
+
+    if loja_atual is None:
+        abort(404)
+
+    return render_template(
+        'promotions.html',
+        promocoes=filtradas,
+        lojas=lojas,
+        loja_atual=loja_atual,
+        whatsapp_group_url=WHATSAPP_GROUP_URL,
+    )
 
 
 @app.route('/promocoes/<slug>')
@@ -679,13 +808,16 @@ def detalhe_promocao(slug):
         abort(404)
 
     info = parse_preco_info(promocao.preco)
+    loja_meta = montar_meta_loja(promocao.link_afiliado)
     promo_view = {
         'id': promocao.id,
         'titulo': promocao.titulo,
         'imagem': promocao.imagem,
         'slug': promocao.slug,
-        'loja_nome': extrair_loja_nome(promocao.link_afiliado),
-        'loja_simbolo': extrair_loja_simbolo(promocao.link_afiliado),
+        'loja_nome': loja_meta['nome'],
+        'loja_slug': loja_meta['slug'],
+        'loja_simbolo': loja_meta['simbolo'],
+        'loja_logo_url': loja_meta['logo_url'],
         'link_afiliado': promocao.link_afiliado,
         'data_publicacao': promocao.data_publicacao,
         'expira_em': promocao.expira_em,

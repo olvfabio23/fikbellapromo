@@ -75,6 +75,83 @@
             flex-wrap: wrap;
         }
 
+        .coupon-box {
+            border: 1px dashed var(--line);
+            border-radius: 12px;
+            padding: 0.8rem;
+            background: #f9fbff;
+            display: grid;
+            gap: 0.7rem;
+        }
+
+        .coupon-list {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .coupon-pill {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: #fff;
+            padding: 0.45rem 0.7rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .coupon-pill.active {
+            background: #e7eeff;
+            border-color: #9cb2ff;
+            color: #1b3186;
+        }
+
+        .mini-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr auto;
+            gap: 0.6rem;
+        }
+
+        select {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 0.65rem 0.7rem;
+            font-size: 0.95rem;
+            background: #fff;
+        }
+
+        .preview-price {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 0.7rem;
+            background: #fff;
+            display: grid;
+            gap: 0.25rem;
+        }
+
+        .old-price {
+            color: var(--muted);
+            text-decoration: line-through;
+            font-size: 0.9rem;
+        }
+
+        .new-price {
+            color: #1f6e49;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .discount-badge {
+            display: inline-block;
+            padding: 0.2rem 0.45rem;
+            border-radius: 999px;
+            background: #ffe4e4;
+            color: #8d1d1d;
+            font-size: 0.75rem;
+            font-weight: 700;
+            width: fit-content;
+        }
+
         button {
             border: 0;
             border-radius: 10px;
@@ -114,6 +191,7 @@
 
         @media (max-width: 840px) {
             .grid { grid-template-columns: 1fr; }
+            .mini-grid { grid-template-columns: 1fr; }
             table, thead, tbody, th, td, tr { display: block; }
             thead { display: none; }
             tr {
@@ -147,8 +225,12 @@
                         <input id="titulo" name="titulo" required>
                     </div>
                     <div>
-                        <label for="preco">Preco</label>
-                        <input id="preco" name="preco" placeholder="Ex: R$ 199,90" required>
+                        <label for="preco_anuncio">Preco do anuncio (sem desconto)</label>
+                        <input id="preco_anuncio" name="preco_anuncio" placeholder="Ex: R$ 199,90" required>
+                    </div>
+                    <div>
+                        <label for="preco">Preco final (com desconto)</label>
+                        <input id="preco" name="preco" placeholder="Ex: R$ 159,90" required>
                     </div>
                     <div class="full">
                         <label for="imagem">URL da imagem</label>
@@ -159,6 +241,38 @@
                         <input id="link_afiliado" name="link_afiliado" type="url" required>
                     </div>
                 </div>
+
+                <div class="coupon-box">
+                    <div class="actions" style="margin-top: 0;">
+                        <button class="ghost" type="button" id="btn-toggle-cupom">Add cupom</button>
+                    </div>
+
+                    <div id="coupon-area" style="display:none;">
+                        <p class="hint" style="margin-bottom:0.5rem;">Escolha um cupom salvo ou cadastre um novo antes de salvar a promocao.</p>
+                        <div id="coupon-list" class="coupon-list"></div>
+
+                        <div class="mini-grid" style="margin-top:0.7rem;">
+                            <input id="novo_cupom_nome" placeholder="Novo cupom (ex: PROMOJA)">
+                            <select id="novo_cupom_tipo">
+                                <option value="percentual">Percentual (%)</option>
+                                <option value="fixo">Valor fixo (R$)</option>
+                            </select>
+                            <input id="novo_cupom_valor" type="number" min="0.01" step="0.01" placeholder="Valor">
+                            <button class="ghost" type="button" id="btn-salvar-cupom">Salvar cupom</button>
+                        </div>
+                    </div>
+
+                    <div class="preview-price" id="preco-preview" style="display:none;">
+                        <span class="old-price" id="preview-old"></span>
+                        <span class="new-price" id="preview-new"></span>
+                        <span class="discount-badge" id="preview-discount" style="display:none;"></span>
+                    </div>
+                </div>
+
+                <input type="hidden" id="desconto_tipo" name="desconto_tipo">
+                <input type="hidden" id="desconto_valor" name="desconto_valor">
+                <input type="hidden" id="cupom_nome" name="cupom_nome">
+
                 <div class="actions">
                     <button class="ghost" type="button" id="btn-autofill">Preencher pelo link</button>
                     <button class="primary" type="submit">Salvar promocao</button>
@@ -188,7 +302,15 @@
                         <tr data-id="{{ p.id }}">
                             <td>{{ p.id }}</td>
                             <td>{{ p.titulo }}</td>
-                            <td>{{ p.preco }}</td>
+                            <td>
+                                {% if p.preco_original %}
+                                    <div style="text-decoration:line-through; color:#666; font-size:0.85rem;">{{ p.preco_original }}</div>
+                                {% endif %}
+                                <div style="font-weight:700; color:#1f6e49;">{{ p.preco_final }}</div>
+                                {% if p.desconto_texto %}
+                                    <div style="font-size:0.75rem; color:#8d1d1d;">{{ p.desconto_texto }}{% if p.cupom_nome %} • {{ p.cupom_nome }}{% endif %}</div>
+                                {% endif %}
+                            </td>
                             <td>{{ p.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</td>
                             <td>{{ p.expira_em.strftime('%d/%m/%Y %H:%M') }}</td>
                             <td>{{ p.total_cliques }}</td>
@@ -203,9 +325,100 @@
     <script>
         const token = new URLSearchParams(window.location.search).get('token') || '';
         const msgEl = document.getElementById('msg');
+        let coupons = [];
+        let activeCoupon = null;
 
         function setMsg(texto) {
             msgEl.textContent = texto;
+        }
+
+        function parseBrValue(texto) {
+            const raw = (texto || '').replace('R$', '').replace(/\s/g, '');
+            if (!raw) return NaN;
+            const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw;
+            const v = Number(normalized);
+            return Number.isFinite(v) ? v : NaN;
+        }
+
+        function formatBrValue(v) {
+            return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function renderCoupons() {
+            const list = document.getElementById('coupon-list');
+            list.innerHTML = '';
+            coupons.forEach((coupon) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'coupon-pill';
+                const suffix = coupon.tipo === 'percentual' ? `${coupon.valor}%` : formatBrValue(Number(coupon.valor));
+                btn.textContent = `${coupon.nome} (${suffix})`;
+                if (activeCoupon && activeCoupon.nome === coupon.nome) {
+                    btn.classList.add('active');
+                }
+                btn.addEventListener('click', () => {
+                    activeCoupon = coupon;
+                    applyCouponPreview();
+                    renderCoupons();
+                });
+                list.appendChild(btn);
+            });
+        }
+
+        function applyCouponPreview() {
+            const precoAnuncio = document.getElementById('preco_anuncio').value.trim();
+            const precoInput = document.getElementById('preco');
+            const preview = document.getElementById('preco-preview');
+            const oldEl = document.getElementById('preview-old');
+            const newEl = document.getElementById('preview-new');
+            const badgeEl = document.getElementById('preview-discount');
+
+            const base = parseBrValue(precoAnuncio);
+            if (!Number.isFinite(base)) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            let finalPrice = base;
+            let discountLabel = '';
+
+            if (activeCoupon) {
+                const val = Number(activeCoupon.valor);
+                if (activeCoupon.tipo === 'percentual') {
+                    finalPrice = base * (1 - (val / 100));
+                    discountLabel = `-${val}%`;
+                } else {
+                    finalPrice = Math.max(0, base - val);
+                    discountLabel = `- ${formatBrValue(val)}`;
+                }
+
+                document.getElementById('desconto_tipo').value = activeCoupon.tipo;
+                document.getElementById('desconto_valor').value = String(activeCoupon.valor);
+                document.getElementById('cupom_nome').value = activeCoupon.nome;
+                badgeEl.style.display = 'inline-block';
+                badgeEl.textContent = `${discountLabel} ${activeCoupon.nome ? '• ' + activeCoupon.nome : ''}`;
+                oldEl.textContent = formatBrValue(base);
+            } else {
+                document.getElementById('desconto_tipo').value = '';
+                document.getElementById('desconto_valor').value = '';
+                document.getElementById('cupom_nome').value = '';
+                badgeEl.style.display = 'none';
+                oldEl.textContent = '';
+            }
+
+            const finalText = formatBrValue(finalPrice);
+            precoInput.value = finalText;
+            newEl.textContent = finalText;
+            preview.style.display = 'grid';
+        }
+
+        async function loadCoupons() {
+            const resp = await fetch('/api/admin/coupons?token=' + encodeURIComponent(token));
+            const data = await resp.json().catch(() => ({}));
+            if (resp.ok && data.ok && Array.isArray(data.coupons)) {
+                coupons = data.coupons;
+                renderCoupons();
+            }
         }
 
         async function excluir(id) {
@@ -249,6 +462,45 @@
             window.location.reload();
         });
 
+        document.getElementById('btn-toggle-cupom').addEventListener('click', () => {
+            const area = document.getElementById('coupon-area');
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.getElementById('btn-salvar-cupom').addEventListener('click', async () => {
+            const nome = document.getElementById('novo_cupom_nome').value.trim();
+            const tipo = document.getElementById('novo_cupom_tipo').value;
+            const valor = document.getElementById('novo_cupom_valor').value;
+
+            if (!nome || !valor) {
+                setMsg('Preencha nome e valor do novo cupom.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('token', token);
+            formData.append('nome', nome);
+            formData.append('tipo', tipo);
+            formData.append('valor', valor);
+
+            const resp = await fetch('/api/admin/coupons', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await resp.json().catch(() => ({}));
+
+            if (!resp.ok || !data.ok) {
+                setMsg((data && data.erro) ? data.erro : 'Falha ao salvar cupom.');
+                return;
+            }
+
+            coupons = data.coupons || [];
+            activeCoupon = coupons.find(c => c.nome === nome.toUpperCase()) || null;
+            renderCoupons();
+            applyCouponPreview();
+            setMsg('Cupom salvo com sucesso.');
+        });
+
         document.getElementById('btn-autofill').addEventListener('click', async () => {
             const productUrl = document.getElementById('product_url').value.trim();
             if (!productUrl) {
@@ -277,8 +529,11 @@
             if (dados.titulo) {
                 document.getElementById('titulo').value = dados.titulo;
             }
-            if (dados.preco) {
-                document.getElementById('preco').value = dados.preco;
+            if (dados.preco_original) {
+                document.getElementById('preco_anuncio').value = dados.preco_original;
+            }
+            if (dados.preco_atual) {
+                document.getElementById('preco').value = dados.preco_atual;
             }
             if (dados.imagem) {
                 document.getElementById('imagem').value = dados.imagem;
@@ -287,12 +542,17 @@
                 document.getElementById('link_afiliado').value = dados.link_afiliado;
             }
 
+            applyCouponPreview();
+
             if (Array.isArray(data.campos_faltantes) && data.campos_faltantes.length) {
                 setMsg('Extraido parcialmente. Complete os campos: ' + data.campos_faltantes.join(', '));
             } else {
                 setMsg('Dados extraidos com sucesso. Revise e salve a promocao.');
             }
         });
+
+        document.getElementById('preco_anuncio').addEventListener('input', applyCouponPreview);
+        loadCoupons();
 
         document.getElementById('btn-cleanup').addEventListener('click', async () => {
             const resp = await fetch('/api/admin/promocoes/cleanup?token=' + encodeURIComponent(token), {

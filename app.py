@@ -40,6 +40,7 @@ PROMOTION_DB_SCHEMA = os.getenv('PROMOTION_DB_SCHEMA', '')
 AUTO_INIT_DB = os.getenv('AUTO_INIT_DB', 'false').lower() == 'true'
 
 COUPONS_FILE = 'saved_coupons.json'
+ADMIN_COUPONS_FILE = 'saved_admin_coupons.json'
 
 
 class Promocao(db.Model):
@@ -59,10 +60,14 @@ class Promocao(db.Model):
     ultimo_clique_em = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self):
+        preco_info = parse_preco_info(self.preco)
         return {
             'id': self.id,
             'titulo': self.titulo,
-            'preco': self.preco,
+            'preco': preco_info['preco_final'],
+            'preco_original': preco_info['preco_original'],
+            'desconto_texto': preco_info['desconto_texto'],
+            'cupom_nome': preco_info['cupom_nome'],
             'imagem': self.imagem,
             'link_afiliado': self.link_afiliado,
             'link_interno': url_for('detalhe_promocao', slug=self.slug, _external=True),
@@ -124,6 +129,150 @@ def _formatar_preco(preco_bruto):
         if len(partes[-1]) == 2:
             valor = ','.join(['.'.join(partes[:-1]), partes[-1]])
     return f'R$ {valor}'
+
+
+def _parse_preco_to_float(preco_texto):
+    texto = (preco_texto or '').strip().replace('R$', '').replace(' ', '')
+    if not texto:
+        return None
+
+    if ',' in texto and '.' in texto:
+        texto = texto.replace('.', '').replace(',', '.')
+    elif ',' in texto:
+        texto = texto.replace(',', '.')
+
+    match = re.search(r'-?\d+(?:\.\d+)?', texto)
+    if not match:
+        return None
+
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+def _format_preco_br(valor):
+    if valor is None:
+        return ''
+    return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def parse_preco_info(preco_armazenado):
+    info_padrao = {
+        'preco_final': preco_armazenado,
+        'preco_original': '',
+        'desconto_texto': '',
+        'cupom_nome': '',
+    }
+
+    if not preco_armazenado:
+        return info_padrao
+
+    try:
+        data = json.loads(preco_armazenado)
+    except Exception:
+        return info_padrao
+
+    if not isinstance(data, dict):
+        return info_padrao
+
+    preco_final = (data.get('preco_final') or '').strip()
+    preco_original = (data.get('preco_original') or '').strip()
+    desconto_texto = (data.get('desconto_texto') or '').strip()
+    cupom_nome = (data.get('cupom_nome') or '').strip()
+
+    if not preco_final:
+        return info_padrao
+
+    return {
+        'preco_final': preco_final,
+        'preco_original': preco_original,
+        'desconto_texto': desconto_texto,
+        'cupom_nome': cupom_nome,
+    }
+
+
+def build_preco_storage(preco_final, preco_original='', desconto_texto='', cupom_nome=''):
+    payload = {
+        'preco_final': (preco_final or '').strip(),
+        'preco_original': (preco_original or '').strip(),
+        'desconto_texto': (desconto_texto or '').strip(),
+        'cupom_nome': (cupom_nome or '').strip(),
+    }
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def calcular_desconto(preco_anuncio, desconto_tipo, desconto_valor):
+    preco_base = _parse_preco_to_float(preco_anuncio)
+    if preco_base is None:
+        return None
+
+    try:
+        valor = float(desconto_valor)
+    except (TypeError, ValueError):
+        return None
+
+    if valor <= 0:
+        return None
+
+    desconto_tipo = (desconto_tipo or '').lower().strip()
+    if desconto_tipo == 'percentual':
+        if valor > 100:
+            return None
+        preco_final = preco_base * (1 - (valor / 100.0))
+        desconto_texto = f"-{valor:g}%"
+    elif desconto_tipo == 'fixo':
+        preco_final = max(0.0, preco_base - valor)
+        desconto_texto = f"- {_format_preco_br(valor)}"
+    else:
+        return None
+
+    return {
+        'preco_original': _format_preco_br(preco_base),
+        'preco_final': _format_preco_br(preco_final),
+        'desconto_texto': desconto_texto,
+    }
+
+
+def load_admin_coupons():
+    if os.path.exists(ADMIN_COUPONS_FILE):
+        try:
+            with open(ADMIN_COUPONS_FILE, 'r', encoding='utf-8') as file_handle:
+                data = json.load(file_handle)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            return []
+    return []
+
+
+def save_admin_coupon(nome, desconto_tipo, desconto_valor):
+    nome_limpo = (nome or '').strip().upper()
+    if not nome_limpo:
+        return load_admin_coupons()
+
+    try:
+        valor = float(desconto_valor)
+    except (TypeError, ValueError):
+        return load_admin_coupons()
+
+    desconto_tipo = (desconto_tipo or '').strip().lower()
+    if desconto_tipo not in {'percentual', 'fixo'} or valor <= 0:
+        return load_admin_coupons()
+
+    coupons = load_admin_coupons()
+    coupons = [c for c in coupons if (c.get('nome') or '').upper() != nome_limpo]
+    coupons.insert(0, {
+        'nome': nome_limpo,
+        'tipo': desconto_tipo,
+        'valor': valor,
+    })
+    coupons = coupons[:30]
+
+    with open(ADMIN_COUPONS_FILE, 'w', encoding='utf-8') as file_handle:
+        json.dump(coupons, file_handle, ensure_ascii=False, indent=2)
+
+    return coupons
 
 
 def _extrair_do_json_ld(soup):
@@ -197,21 +346,47 @@ def extrair_dados_produto(product_url):
         _get_meta_content(soup, 'meta[property="og:image"]')
         or _get_meta_content(soup, 'meta[name="twitter:image"]')
     )
-    preco = (
+    preco_atual = (
         _get_meta_content(soup, 'meta[property="product:price:amount"]')
         or _get_meta_content(soup, 'meta[property="og:price:amount"]')
         or _get_meta_content(soup, 'meta[itemprop="price"]')
     )
 
-    if not (titulo and imagem and preco):
+    preco_original = (
+        _get_meta_content(soup, 'meta[property="product:original_price:amount"]')
+        or _get_meta_content(soup, 'meta[property="product:price:original_amount"]')
+    )
+
+    if not (titulo and imagem and preco_atual):
         jsonld_titulo, jsonld_preco, jsonld_imagem = _extrair_do_json_ld(soup)
         titulo = titulo or jsonld_titulo
-        preco = preco or jsonld_preco
+        preco_atual = preco_atual or jsonld_preco
         imagem = imagem or jsonld_imagem
+
+    prices_in_text = []
+    for match in re.findall(r'R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}', resposta.text):
+        value = _parse_preco_to_float(match)
+        if value is not None:
+            prices_in_text.append(value)
+
+    prices_in_text = sorted(set(prices_in_text))
+    if prices_in_text:
+        if not preco_atual:
+            preco_atual = _format_preco_br(prices_in_text[0])
+        if not preco_original and len(prices_in_text) > 1:
+            preco_original = _format_preco_br(prices_in_text[-1])
+
+    preco_atual_fmt = _formatar_preco(preco_atual)
+    preco_original_fmt = _formatar_preco(preco_original)
+
+    if not preco_original_fmt:
+        preco_original_fmt = preco_atual_fmt
 
     return {
         'titulo': titulo,
-        'preco': _formatar_preco(preco),
+        'preco': preco_atual_fmt,
+        'preco_atual': preco_atual_fmt,
+        'preco_original': preco_original_fmt,
         'imagem': imagem,
         'link_afiliado': product_url,
     }
@@ -317,7 +492,20 @@ def get_coupons():
 
 @app.route('/promocoes')
 def vitrine_promocoes():
-    promocoes = buscar_promocoes_ativas()
+    promocoes = []
+    for promo in buscar_promocoes_ativas():
+        info = parse_preco_info(promo.preco)
+        promocoes.append({
+            'id': promo.id,
+            'titulo': promo.titulo,
+            'imagem': promo.imagem,
+            'slug': promo.slug,
+            'data_publicacao': promo.data_publicacao,
+            'preco_final': info['preco_final'],
+            'preco_original': info['preco_original'],
+            'desconto_texto': info['desconto_texto'],
+            'cupom_nome': info['cupom_nome'],
+        })
     return render_template('promotions.html', promocoes=promocoes)
 
 
@@ -328,7 +516,21 @@ def detalhe_promocao(slug):
     if promocao.expira_em < datetime.utcnow():
         abort(404)
 
-    return render_template('promotion_detail.html', promocao=promocao)
+    info = parse_preco_info(promocao.preco)
+    promo_view = {
+        'id': promocao.id,
+        'titulo': promocao.titulo,
+        'imagem': promocao.imagem,
+        'slug': promocao.slug,
+        'link_afiliado': promocao.link_afiliado,
+        'data_publicacao': promocao.data_publicacao,
+        'expira_em': promocao.expira_em,
+        'preco_final': info['preco_final'],
+        'preco_original': info['preco_original'],
+        'desconto_texto': info['desconto_texto'],
+        'cupom_nome': info['cupom_nome'],
+    }
+    return render_template('promotion_detail.html', promocao=promo_view)
 
 
 @app.route('/r/<int:promocao_id>')
@@ -355,8 +557,50 @@ def api_promocoes():
 @app.route('/admin/promocoes')
 def admin_promocoes():
     validar_admin_token()
-    promocoes = Promocao.query.order_by(Promocao.data_publicacao.desc()).all()
+    promocoes = []
+    for promo in Promocao.query.order_by(Promocao.data_publicacao.desc()).all():
+        info = parse_preco_info(promo.preco)
+        promocoes.append({
+            'id': promo.id,
+            'titulo': promo.titulo,
+            'preco_final': info['preco_final'],
+            'preco_original': info['preco_original'],
+            'desconto_texto': info['desconto_texto'],
+            'cupom_nome': info['cupom_nome'],
+            'data_publicacao': promo.data_publicacao,
+            'expira_em': promo.expira_em,
+            'total_cliques': promo.total_cliques,
+        })
     return render_template('admin_promotions.html', promocoes=promocoes, ttl_dias=PROMOTION_TTL_DAYS)
+
+
+@app.route('/api/admin/coupons', methods=['GET'])
+def listar_admin_coupons():
+    validar_admin_token()
+    return jsonify({'ok': True, 'coupons': load_admin_coupons()})
+
+
+@app.route('/api/admin/coupons', methods=['POST'])
+def cadastrar_admin_coupon():
+    validar_admin_token()
+    payload = request.get_json(silent=True) or request.form
+    nome = (payload.get('nome') or '').strip()
+    desconto_tipo = (payload.get('tipo') or '').strip().lower()
+    desconto_valor = (payload.get('valor') or '').strip()
+
+    if not nome or desconto_tipo not in {'percentual', 'fixo'}:
+        return jsonify({'erro': 'Informe nome e tipo válido (percentual/fixo).'}), 400
+
+    try:
+        valor = float(desconto_valor)
+    except (TypeError, ValueError):
+        return jsonify({'erro': 'Valor do desconto inválido.'}), 400
+
+    if valor <= 0:
+        return jsonify({'erro': 'Valor do desconto deve ser maior que zero.'}), 400
+
+    coupons = save_admin_coupon(nome, desconto_tipo, valor)
+    return jsonify({'ok': True, 'coupons': coupons})
 
 
 @app.route('/api/admin/promocoes', methods=['POST'])
@@ -367,16 +611,41 @@ def criar_promocao():
 
     titulo = (payload.get('titulo') or '').strip()
     preco = (payload.get('preco') or '').strip()
+    preco_anuncio = (payload.get('preco_anuncio') or '').strip()
+    desconto_tipo = (payload.get('desconto_tipo') or '').strip().lower()
+    desconto_valor = (payload.get('desconto_valor') or '').strip()
+    cupom_nome = (payload.get('cupom_nome') or '').strip().upper()
     imagem = (payload.get('imagem') or '').strip()
     link_afiliado = (payload.get('link_afiliado') or '').strip()
 
     if not titulo or not preco or not imagem or not link_afiliado:
         return jsonify({'erro': 'Campos obrigatórios: titulo, preco, imagem, link_afiliado.'}), 400
 
+    preco_original = ''
+    desconto_texto = ''
+
+    if preco_anuncio:
+        preco_original = preco_anuncio
+
+    if desconto_tipo and desconto_valor:
+        calculo = calcular_desconto(preco_anuncio or preco, desconto_tipo, desconto_valor)
+        if not calculo:
+            return jsonify({'erro': 'Desconto inválido para o preço informado.'}), 400
+        preco = calculo['preco_final']
+        preco_original = calculo['preco_original']
+        desconto_texto = calculo['desconto_texto']
+
+    preco_armazenado = build_preco_storage(
+        preco_final=preco,
+        preco_original=preco_original,
+        desconto_texto=desconto_texto,
+        cupom_nome=cupom_nome,
+    )
+
     data_publicacao = datetime.utcnow()
     promocao = Promocao(
         titulo=titulo,
-        preco=preco,
+        preco=preco_armazenado,
         imagem=imagem,
         link_afiliado=link_afiliado,
         slug=gerar_slug_unico(titulo),
@@ -405,7 +674,7 @@ def extrair_promocao_por_link():
         return jsonify({'erro': f'Falha ao acessar URL: {exc}'}), 502
 
     faltantes = [
-        campo for campo in ('titulo', 'preco', 'imagem') if not (dados.get(campo) or '').strip()
+        campo for campo in ('titulo', 'preco_atual', 'imagem') if not (dados.get(campo) or '').strip()
     ]
 
     return jsonify({'ok': True, 'dados': dados, 'campos_faltantes': faltantes})

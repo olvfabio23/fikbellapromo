@@ -104,6 +104,24 @@
             color: var(--brand-strong);
         }
 
+        .old-price {
+            margin: 0;
+            color: var(--muted);
+            text-decoration: line-through;
+            font-size: 0.88rem;
+        }
+
+        .discount {
+            margin: 0;
+            width: fit-content;
+            padding: 0.18rem 0.45rem;
+            border-radius: 999px;
+            background: #ffe7e1;
+            color: #8d2b14;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
         .meta {
             margin: 0;
             color: var(--muted);
@@ -160,7 +178,13 @@
                         <img src="{{ promocao.imagem }}" alt="{{ promocao.titulo }}" loading="lazy">
                         <div class="card-body">
                             <h2 class="title">{{ promocao.titulo }}</h2>
-                            <p class="price">{{ promocao.preco }}</p>
+                            {% if promocao.preco_original %}
+                                <p class="old-price">{{ promocao.preco_original }}</p>
+                            {% endif %}
+                            <p class="price">{{ promocao.preco_final }}</p>
+                            {% if promocao.desconto_texto %}
+                                <p class="discount">{{ promocao.desconto_texto }}{% if promocao.cupom_nome %} • {{ promocao.cupom_nome }}{% endif %}</p>
+                            {% endif %}
                             <p class="meta">Publicada em {{ promocao.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</p>
                             <div class="actions">
                                 <a class="btn" href="{{ url_for('detalhe_promocao', slug=promocao.slug) }}">Ver detalhes</a>

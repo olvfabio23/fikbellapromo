@@ -70,6 +70,24 @@
             font-weight: 700;
         }
 
+        .old-price {
+            margin: 0;
+            color: var(--muted);
+            text-decoration: line-through;
+            font-size: 0.95rem;
+        }
+
+        .discount {
+            margin: 0;
+            width: fit-content;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            background: #ffe9e0;
+            color: #7d2c18;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
         .meta {
             color: var(--muted);
             font-size: 0.92rem;
@@ -110,7 +128,13 @@
 
         <section class="card content">
             <h1>{{ promocao.titulo }}</h1>
-            <p class="price">{{ promocao.preco }}</p>
+            {% if promocao.preco_original %}
+                <p class="old-price">{{ promocao.preco_original }}</p>
+            {% endif %}
+            <p class="price">{{ promocao.preco_final }}</p>
+            {% if promocao.desconto_texto %}
+                <p class="discount">{{ promocao.desconto_texto }}{% if promocao.cupom_nome %} • {{ promocao.cupom_nome }}{% endif %}</p>
+            {% endif %}
             <p class="meta">Publicada em {{ promocao.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</p>
             <p class="meta">Expira em {{ promocao.expira_em.strftime('%d/%m/%Y %H:%M') }}</p>
             <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}">Ir para oferta afiliada</a>

@@ -183,15 +183,15 @@ def extrair_loja_logo(link):
         pass
 
     mapa = {
-        'mercadolivre': 'mercado_livre.png',
-        'shopee': 'shopee.png',
-        'magazineluiza': 'Magalu.png',
-        'magalu': 'Magalu.png',
-        'amazon': 'Amazon.jpg',
+        'mercadolivre': '/static/mercado_livre.png',
+        'shopee': '/static/shopee.png',
+        'magazineluiza': '/static/Magalu.png',
+        'magalu': '/static/Magalu.png',
+        'amazon': '/static/Amazon.jpg',
     }
-    for chave, arquivo in mapa.items():
+    for chave, caminho in mapa.items():
         if chave in host:
-            return url_for('static', filename=arquivo)
+            return caminho
     return ''
 
 
@@ -219,7 +219,7 @@ def titulo_do_path_url(product_url):
 
     candidatos = []
     for part in parts:
-        if re.search(r'[a-zA-Z]', part) and not re.fullmatch(r'[0-9]+', part):
+        if re.search(r'[a-zA-Z]', part) and not re.fullmatch(r'[0-9]+', part) and not part.lower() in ['p', 'produto', 'product', 'item', 'br', 'com']:
             candidatos.append(part)
 
     if not candidatos:
@@ -228,8 +228,11 @@ def titulo_do_path_url(product_url):
     bruto = max(candidatos, key=len)
     bruto = re.sub(r'[-_]+', ' ', bruto)
     bruto = re.sub(r'\s+', ' ', bruto).strip()
-    if len(bruto) < 4:
+    if len(bruto) < 8:
         return ''
+    palavras = bruto.split()
+    if len(palavras) > 12:
+        bruto = ' '.join(palavras[:12])
     return bruto.title()
 
 

@@ -165,6 +165,41 @@
             font-size: 0.9rem;
         }
 
+        .cupom-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            margin: 0.8rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .cupom-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+        }
+
+        .cupom-label {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 600;
+        }
+
+        .cupom-code {
+            flex: 1;
+            font-size: 1.1rem;
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .cupom-icon {
+            font-size: 1.2rem;
+        }
+
         .wa-btn {
             text-decoration: none;
             text-align: center;
@@ -221,13 +256,20 @@
             <p class="new-price">{{ promocao.preco_final }}</p>
 
             {% if promocao.desconto_texto %}
-                <p class="discount">{{ promocao.desconto_texto }}{% if promocao.cupom_nome %} • {{ promocao.cupom_nome }}{% endif %}</p>
+                <p class="discount">{{ promocao.desconto_texto }}</p>
+            {% endif %}
+
+            {% if promocao.cupom_nome %}
+                <div class="cupom-box" onclick="copiarCupom('{{ promocao.cupom_nome }}')" title="Clique para copiar o cupom">
+                    <span class="cupom-label">CUPOM:</span>
+                    <span class="cupom-code">{{ promocao.cupom_nome }}</span>
+                    <span class="cupom-icon">📋</span>
+                </div>
             {% endif %}
 
             <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}">Pegar promocao</a>
 
-            <p class="meta">Publicado em {{ promocao.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</p>
-            <p class="meta">Expira em {{ promocao.expira_em.strftime('%d/%m/%Y %H:%M') }}</p>
+            <p class="meta">Publicado em {{ promocao.data_formatada }}</p>
 
             <div class="wa-box">
                 <h3>Gostou dessa promocao?</h3>
@@ -236,5 +278,18 @@
             </div>
         </aside>
     </main>
+    <script>
+        function copiarCupom(codigo) {
+            navigator.clipboard.writeText(codigo).then(() => {
+                const msg = document.createElement('div');
+                msg.textContent = `Cupom ${codigo} copiado!`;
+                msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#4CAF50;color:#fff;padding:12px 24px;border-radius:8px;font-weight:700;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 2500);
+            }).catch(() => {
+                alert('Cupom: ' + codigo);
+            });
+        }
+    </script>
 </body>
 </html>

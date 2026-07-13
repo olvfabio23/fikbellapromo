@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, send_file, flash, redirect, u
 import os
 import json
 from datetime import datetime, timedelta
+import pytz
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -116,6 +117,8 @@ def extrair_loja_nome(link):
     host = host.replace('www.', '')
     mapa = {
         'mercadolivre': 'Mercado Livre',
+        'mercadolibre': 'Mercado Livre',
+        'mlb': 'Mercado Livre',
         'shopee': 'Shopee',
         'amazon': 'Amazon',
         'magazineluiza': 'Magalu',
@@ -185,6 +188,8 @@ def extrair_loja_logo(link):
 
     mapa = {
         'mercadolivre': 'mercado_livre.png',
+        'mercadolibre': 'mercado_livre.png',
+        'mlb': 'mercado_livre.png',
         'shopee': 'shopee.png',
         'magazineluiza': 'Magalu.png',
         'magalu': 'Magalu.png',
@@ -205,6 +210,18 @@ def montar_meta_loja(link):
         'logo_arquivo': logo_arquivo,
         'logo_url': f'/static/{logo_arquivo}' if logo_arquivo else '',
     }
+
+
+def formatar_data_br(dt_utc):
+    """Converte datetime UTC para timezone de São Paulo e formata."""
+    if not dt_utc:
+        return ''
+    try:
+        sp_tz = pytz.timezone('America/Sao_Paulo')
+        dt_sp = dt_utc.replace(tzinfo=pytz.utc).astimezone(sp_tz)
+        return dt_sp.strftime('%d/%m/%Y %H:%M')
+    except Exception:
+        return dt_utc.strftime('%d/%m/%Y %H:%M')
 
 
 def titulo_do_path_url(product_url):
@@ -786,6 +803,7 @@ def montar_promocoes_view(promocoes_db):
             'loja_simbolo': loja_meta['simbolo'],
             'loja_logo_url': loja_meta['logo_url'],
             'data_publicacao': promo.data_publicacao,
+            'data_formatada': formatar_data_br(promo.data_publicacao),
             'preco_final': info['preco_final'],
             'preco_original': info['preco_original'],
             'desconto_texto': info['desconto_texto'],
@@ -847,6 +865,7 @@ def detalhe_promocao(slug):
         'loja_logo_url': loja_meta['logo_url'],
         'link_afiliado': promocao.link_afiliado,
         'data_publicacao': promocao.data_publicacao,
+        'data_formatada': formatar_data_br(promocao.data_publicacao),
         'expira_em': promocao.expira_em,
         'preco_final': info['preco_final'],
         'preco_original': info['preco_original'],

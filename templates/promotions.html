@@ -130,6 +130,7 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
             gap: 0.9rem;
+            align-items: start;
         }
 
         .card {
@@ -222,6 +223,41 @@
             margin: 0;
             font-size: 0.82rem;
             color: var(--muted);
+        }
+
+        .cupom-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            padding: 0.5rem 0.7rem;
+            margin: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .cupom-box:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .cupom-label {
+            font-size: 0.7rem;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 600;
+        }
+
+        .cupom-code {
+            flex: 1;
+            font-size: 0.9rem;
+            color: #fff;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .cupom-icon {
+            font-size: 1rem;
         }
 
         .actions {
@@ -326,10 +362,18 @@
                             <p class="new-price">{{ promocao.preco_final }}</p>
 
                             {% if promocao.desconto_texto %}
-                                <p class="discount">{{ promocao.desconto_texto }}{% if promocao.cupom_nome %} • {{ promocao.cupom_nome }}{% endif %}</p>
+                                <p class="discount">{{ promocao.desconto_texto }}</p>
                             {% endif %}
 
-                            <p class="meta">Atualizada em {{ promocao.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</p>
+                            {% if promocao.cupom_nome %}
+                                <div class="cupom-box" onclick="copiarCupom('{{ promocao.cupom_nome }}')" title="Clique para copiar o cupom">
+                                    <span class="cupom-label">CUPOM:</span>
+                                    <span class="cupom-code">{{ promocao.cupom_nome }}</span>
+                                    <span class="cupom-icon">📋</span>
+                                </div>
+                            {% endif %}
+
+                            <p class="meta">Atualizada em {{ promocao.data_formatada }}</p>
 
                             <div class="actions">
                                 <a class="btn" href="{{ url_for('detalhe_promocao', slug=promocao.slug) }}">Ver detalhes</a>
@@ -343,5 +387,18 @@
             <div class="empty">Nenhuma promocao ativa no momento.</div>
         {% endif %}
     </main>
+    <script>
+        function copiarCupom(codigo) {
+            navigator.clipboard.writeText(codigo).then(() => {
+                const msg = document.createElement('div');
+                msg.textContent = `Cupom ${codigo} copiado!`;
+                msg.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#4CAF50;color:#fff;padding:12px 24px;border-radius:8px;font-weight:700;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);';
+                document.body.appendChild(msg);
+                setTimeout(() => msg.remove(), 2500);
+            }).catch(() => {
+                alert('Cupom: ' + codigo);
+            });
+        }
+    </script>
 </body>
 </html>

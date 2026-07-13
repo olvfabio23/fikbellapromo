@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from flask_sqlalchemy import SQLAlchemy
 from jinja2 import TemplateNotFound
 from urllib.parse import urlparse
+from urllib.parse import urljoin
 
 try:
     from scraper import ProductScraper
@@ -134,6 +135,114 @@ def extrair_loja_nome(link):
         if base:
             return base[0].capitalize()
     return 'Loja parceira'
+
+
+def extrair_loja_simbolo(link):
+    try:
+        host = (urlparse(link).netloc or '').lower().replace('www.', '')
+    except Exception:
+        return '🛍️'
+
+    mapa = {
+        'mercadolivre': '🟡',
+        'shopee': '🟠',
+        'amazon': '🛒',
+        'magazineluiza': '🔵',
+        'magalu': '🔵',
+        'aliexpress': '🔴',
+        'shein': '⚫',
+        'netshoes': '🏃',
+        'centauro': '⚽',
+    }
+    for chave, simbolo in mapa.items():
+        if chave in host:
+            return simbolo
+    return '🛍️'
+
+
+def _normalize_url(product_url):
+    url = (product_url or '').strip()
+    if not url:
+        return ''
+    if not re.match(r'^https?://', url, flags=re.IGNORECASE):
+        url = f'https://{url}'
+    return url
+
+
+def _expand_short_url(product_url, headers):
+    session = requests.Session()
+    session.headers.update(headers)
+
+    try:
+        resp = session.get(product_url, timeout=20, allow_redirects=True)
+        resp.raise_for_status()
+        return resp.url, resp.text
+    except requests.RequestException:
+        pass
+
+    try:
+        resp = session.head(product_url, timeout=20, allow_redirects=True)
+        resp.raise_for_status()
+        return resp.url, ''
+    except requests.RequestException:
+        return product_url, ''
+
+
+def _extract_price_candidates(text):
+    if not text:
+        return []
+    candidates = []
+    patterns = [
+        r'R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}',
+        r'\d{1,3}(?:\.\d{3})*,\d{2}\s*R\$',
+        r'"price"\s*[:=]\s*"?(\d+(?:\.\d{1,2})?)"?',
+        r'"salePrice"\s*[:=]\s*"?(\d+(?:\.\d{1,2})?)"?',
+        r'"bestPrice"\s*[:=]\s*"?(\d+(?:\.\d{1,2})?)"?',
+    ]
+
+    for pattern in patterns:
+        for match in re.findall(pattern, text, flags=re.IGNORECASE):
+            raw = match if isinstance(match, str) else str(match)
+            num = _parse_preco_to_float(raw)
+            if num is not None and num > 0:
+                candidates.append(num)
+
+    return sorted(set(candidates))
+
+
+def _extract_image_from_html(soup, base_url):
+    imagem = (
+        _get_meta_content(soup, 'meta[property="og:image"]')
+        or _get_meta_content(soup, 'meta[name="twitter:image"]')
+    )
+    if imagem:
+        return imagem
+
+    for selector in ['img#landingImage', 'img[data-old-hires]', 'img[itemprop="image"]', 'img[src]']:
+        tag = soup.select_one(selector)
+        if not tag:
+            continue
+        src = (tag.get('data-old-hires') or tag.get('src') or '').strip()
+        if src:
+            return urljoin(base_url, src)
+    return ''
+
+
+def _extract_title_from_html(soup):
+    titulo = (
+        _get_meta_content(soup, 'meta[property="og:title"]')
+        or _get_meta_content(soup, 'meta[name="twitter:title"]')
+    )
+    if titulo:
+        return titulo
+
+    for selector in ['h1[itemprop="name"]', 'h1', 'title']:
+        tag = soup.select_one(selector)
+        if tag:
+            texto = tag.get_text(' ', strip=True)
+            if texto:
+                return texto
+    return ''
 
 
 def _get_meta_content(soup, selector):
@@ -357,27 +466,33 @@ def _extrair_do_json_ld(soup):
 
 
 def extrair_dados_produto(product_url):
+    product_url = _normalize_url(product_url)
+    if not product_url:
+        raise requests.RequestException('URL inválida.')
+
     headers = {
         'User-Agent': (
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
             'AppleWebKit/537.36 (KHTML, like Gecko) '
             'Chrome/126.0.0.0 Safari/537.36'
-        )
+        ),
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     }
-    resposta = requests.get(product_url, headers=headers, timeout=20)
-    resposta.raise_for_status()
 
-    soup = BeautifulSoup(resposta.text, 'lxml')
+    final_url, html_text = _expand_short_url(product_url, headers)
+    if not html_text:
+        try:
+            resp = requests.get(final_url, headers=headers, timeout=20)
+            resp.raise_for_status()
+            html_text = resp.text
+        except requests.RequestException:
+            html_text = ''
 
-    titulo = (
-        _get_meta_content(soup, 'meta[property="og:title"]')
-        or _get_meta_content(soup, 'meta[name="twitter:title"]')
-        or (soup.title.get_text(strip=True) if soup.title else '')
-    )
-    imagem = (
-        _get_meta_content(soup, 'meta[property="og:image"]')
-        or _get_meta_content(soup, 'meta[name="twitter:image"]')
-    )
+    soup = BeautifulSoup(html_text or '', 'lxml')
+
+    titulo = _extract_title_from_html(soup)
+    imagem = _extract_image_from_html(soup, final_url)
     preco_atual = (
         _get_meta_content(soup, 'meta[property="product:price:amount"]')
         or _get_meta_content(soup, 'meta[property="og:price:amount"]')
@@ -395,13 +510,21 @@ def extrair_dados_produto(product_url):
         preco_atual = preco_atual or jsonld_preco
         imagem = imagem or jsonld_imagem
 
-    prices_in_text = []
-    for match in re.findall(r'R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}', resposta.text):
-        value = _parse_preco_to_float(match)
-        if value is not None:
-            prices_in_text.append(value)
+    prices_in_text = _extract_price_candidates(html_text)
 
-    prices_in_text = sorted(set(prices_in_text))
+    if not prices_in_text and final_url:
+        try:
+            jina_url = f"https://r.jina.ai/http://{final_url.replace('https://', '').replace('http://', '')}"
+            jina_resp = requests.get(jina_url, headers=headers, timeout=20)
+            if jina_resp.ok:
+                prices_in_text = _extract_price_candidates(jina_resp.text)
+                if not titulo:
+                    title_match = re.search(r'^Title:\s*(.+)$', jina_resp.text, flags=re.MULTILINE)
+                    if title_match:
+                        titulo = title_match.group(1).strip()
+        except requests.RequestException:
+            pass
+
     if prices_in_text:
         if not preco_atual:
             preco_atual = _format_preco_br(prices_in_text[0])
@@ -414,13 +537,18 @@ def extrair_dados_produto(product_url):
     if not preco_original_fmt:
         preco_original_fmt = preco_atual_fmt
 
+    if not titulo and final_url:
+        titulo = f'Oferta {extrair_loja_nome(final_url)}'
+
     return {
         'titulo': titulo,
         'preco': preco_atual_fmt,
         'preco_atual': preco_atual_fmt,
         'preco_original': preco_original_fmt,
         'imagem': imagem,
-        'link_afiliado': product_url,
+        'link_afiliado': final_url or product_url,
+        'loja_nome': extrair_loja_nome(final_url or product_url),
+        'loja_simbolo': extrair_loja_simbolo(final_url or product_url),
     }
 
 
@@ -533,6 +661,7 @@ def vitrine_promocoes():
             'imagem': promo.imagem,
             'slug': promo.slug,
             'loja_nome': extrair_loja_nome(promo.link_afiliado),
+            'loja_simbolo': extrair_loja_simbolo(promo.link_afiliado),
             'data_publicacao': promo.data_publicacao,
             'preco_final': info['preco_final'],
             'preco_original': info['preco_original'],
@@ -556,6 +685,7 @@ def detalhe_promocao(slug):
         'imagem': promocao.imagem,
         'slug': promocao.slug,
         'loja_nome': extrair_loja_nome(promocao.link_afiliado),
+        'loja_simbolo': extrair_loja_simbolo(promocao.link_afiliado),
         'link_afiliado': promocao.link_afiliado,
         'data_publicacao': promocao.data_publicacao,
         'expira_em': promocao.expira_em,

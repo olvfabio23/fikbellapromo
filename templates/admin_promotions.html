@@ -332,6 +332,10 @@
             msgEl.textContent = texto;
         }
 
+        function sanitizeText(text) {
+            return (text || '').toString().trim();
+        }
+
         function parseBrValue(texto) {
             const raw = (texto || '').replace('R$', '').replace(/\s/g, '');
             if (!raw) return NaN;
@@ -542,11 +546,16 @@
                 document.getElementById('link_afiliado').value = dados.link_afiliado;
             }
 
+            const lojaTexto = [sanitizeText(dados.loja_simbolo), sanitizeText(dados.loja_nome)].filter(Boolean).join(' ');
+            if (lojaTexto) {
+                setMsg('Dados extraidos de: ' + lojaTexto + '. Revise e salve.');
+            }
+
             applyCouponPreview();
 
             if (Array.isArray(data.campos_faltantes) && data.campos_faltantes.length) {
                 setMsg('Extraido parcialmente. Complete os campos: ' + data.campos_faltantes.join(', '));
-            } else {
+            } else if (!lojaTexto) {
                 setMsg('Dados extraidos com sucesso. Revise e salve a promocao.');
             }
         });

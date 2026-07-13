@@ -176,6 +176,7 @@ def extrair_loja_simbolo(link):
 
 
 def extrair_loja_logo(link):
+    """Retorna o nome do arquivo de logo (sem caminho) para ser usado com url_for no template."""
     host = ''
     try:
         host = (urlparse(link).netloc or '').lower().replace('www.', '')
@@ -183,24 +184,26 @@ def extrair_loja_logo(link):
         pass
 
     mapa = {
-        'mercadolivre': '/static/mercado_livre.png',
-        'shopee': '/static/shopee.png',
-        'magazineluiza': '/static/Magalu.png',
-        'magalu': '/static/Magalu.png',
-        'amazon': '/static/Amazon.jpg',
+        'mercadolivre': 'mercado_livre.png',
+        'shopee': 'shopee.png',
+        'magazineluiza': 'Magalu.png',
+        'magalu': 'Magalu.png',
+        'amazon': 'Amazon.jpg',
     }
-    for chave, caminho in mapa.items():
+    for chave, arquivo in mapa.items():
         if chave in host:
-            return caminho
+            return arquivo
     return ''
 
 
 def montar_meta_loja(link):
+    logo_arquivo = extrair_loja_logo(link)
     return {
         'nome': extrair_loja_nome(link),
         'slug': extrair_loja_slug(link),
         'simbolo': extrair_loja_simbolo(link),
-        'logo_url': extrair_loja_logo(link),
+        'logo_arquivo': logo_arquivo,
+        'logo_url': f'/static/{logo_arquivo}' if logo_arquivo else '',
     }
 
 
@@ -619,6 +622,27 @@ def extrair_dados_produto(product_url):
         titulo = titulo_do_path_url(product_url)
     if not titulo and final_url:
         titulo = f'Oferta {extrair_loja_nome(final_url)}'
+    
+    # Filtrar títulos genéricos de páginas de erro/bloqueio
+    titulos_bloqueados = [
+        'shopee brasil',
+        'ofertas incríveis',
+        'não é possível acessar',
+        'acesso negado',
+        'página indisponível',
+        'faça login',
+        'error 403',
+        'forbidden',
+    ]
+    if titulo:
+        titulo_lower = titulo.lower()
+        if any(bloq in titulo_lower for bloq in titulos_bloqueados):
+            # Se pegou título de erro, tenta extrair da URL
+            titulo_alt = titulo_do_path_url(final_url or product_url)
+            if titulo_alt and len(titulo_alt) >= 8:
+                titulo = titulo_alt
+            else:
+                titulo = f'Produto {extrair_loja_nome(final_url or product_url)}'
 
     loja_meta = montar_meta_loja(final_url or product_url)
 

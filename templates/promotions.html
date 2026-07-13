@@ -6,13 +6,14 @@
     <title>Vitrine de Promocoes - Fikbella</title>
     <style>
         :root {
-            --bg: #f6f2ea;
-            --card: #fffdf9;
-            --ink: #1f1b16;
-            --muted: #6d6257;
-            --brand: #c14f2f;
-            --brand-strong: #a53f22;
-            --line: #eadfce;
+            --bg: #f4f1f8;
+            --card: #ffffff;
+            --ink: #1f1d2b;
+            --muted: #67617b;
+            --brand: #b688d8;
+            --brand-strong: #8d57b8;
+            --line: #e6ddf0;
+            --green: #47b857;
         }
 
         * { box-sizing: border-box; }
@@ -22,9 +23,38 @@
             font-family: Georgia, "Times New Roman", serif;
             color: var(--ink);
             background:
-                radial-gradient(circle at 20% 5%, #fff6e3 0%, rgba(255, 246, 227, 0) 45%),
-                radial-gradient(circle at 90% 95%, #ffe8db 0%, rgba(255, 232, 219, 0) 35%),
+                radial-gradient(circle at 20% 5%, #efe4fb 0%, rgba(239, 228, 251, 0) 45%),
+                radial-gradient(circle at 90% 95%, #e5f7ea 0%, rgba(229, 247, 234, 0) 35%),
                 var(--bg);
+        }
+
+        .group-banner {
+            border: 1px solid #bfe8c6;
+            background: linear-gradient(135deg, #f3fff6 0%, #ebfff1 100%);
+            border-radius: 14px;
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.7rem;
+            margin-bottom: 1rem;
+        }
+
+        .group-banner p {
+            margin: 0;
+            color: #1d5e2b;
+            font-size: 0.92rem;
+        }
+
+        .group-banner a {
+            text-decoration: none;
+            background: var(--green);
+            color: #fff;
+            border-radius: 999px;
+            padding: 0.5rem 0.9rem;
+            font-weight: 700;
+            font-size: 0.85rem;
+            white-space: nowrap;
         }
 
         .wrap {
@@ -128,6 +158,18 @@
             font-size: 0.85rem;
         }
 
+        .loja-chip {
+            margin: 0;
+            width: fit-content;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            border: 1px solid #d7c4ea;
+            background: #f9f4ff;
+            color: #64438c;
+            font-weight: 700;
+        }
+
         .actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -163,6 +205,11 @@
 </head>
 <body>
     <main class="wrap">
+        <div class="group-banner">
+            <p>🔥 Entre no grupo VIP para receber promoções em primeira mão.</p>
+            <a href="{{ whatsapp_group_url }}" target="_blank" rel="noopener">Entrar no WhatsApp</a>
+        </div>
+
         <div class="top">
             <div>
                 <h1>Promocoes em destaque</h1>
@@ -177,6 +224,7 @@
                     <article class="card">
                         <img src="{{ promocao.imagem }}" alt="{{ promocao.titulo }}" loading="lazy">
                         <div class="card-body">
+                            <p class="loja-chip">Promocao de loja: {{ promocao.loja_nome }}</p>
                             <h2 class="title">{{ promocao.titulo }}</h2>
                             {% if promocao.preco_original %}
                                 <p class="old-price">{{ promocao.preco_original }}</p>

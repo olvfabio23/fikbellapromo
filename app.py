@@ -11,6 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from flask_sqlalchemy import SQLAlchemy
 from jinja2 import TemplateNotFound
+from urllib.parse import urlparse
 
 try:
     from scraper import ProductScraper
@@ -38,6 +39,7 @@ ADMIN_TOKEN = os.getenv('ADMIN_TOKEN', 'trocar-este-token')
 PROMOTION_TABLE_NAME = os.getenv('PROMOTION_TABLE_NAME', 'fikbella_promocoes')
 PROMOTION_DB_SCHEMA = os.getenv('PROMOTION_DB_SCHEMA', '')
 AUTO_INIT_DB = os.getenv('AUTO_INIT_DB', 'false').lower() == 'true'
+WHATSAPP_GROUP_URL = os.getenv('WHATSAPP_GROUP_URL', 'https://chat.whatsapp.com/LSlj4MmAyMODcyW7us4vCY')
 
 COUPONS_FILE = 'saved_coupons.json'
 ADMIN_COUPONS_FILE = 'saved_admin_coupons.json'
@@ -102,6 +104,36 @@ def validar_admin_token():
     token = request.headers.get('X-Admin-Token') or request.args.get('token') or request.form.get('token')
     if token != ADMIN_TOKEN:
         abort(401, description='Token administrativo inválido.')
+
+
+def extrair_loja_nome(link):
+    try:
+        host = (urlparse(link).netloc or '').lower()
+    except Exception:
+        return 'Loja parceira'
+
+    host = host.replace('www.', '')
+    mapa = {
+        'mercadolivre': 'Mercado Livre',
+        'shopee': 'Shopee',
+        'amazon': 'Amazon',
+        'magazineluiza': 'Magalu',
+        'magalu': 'Magalu',
+        'aliexpress': 'AliExpress',
+        'shein': 'SHEIN',
+        'netshoes': 'Netshoes',
+        'centauro': 'Centauro',
+    }
+
+    for chave, nome in mapa.items():
+        if chave in host:
+            return nome
+
+    if host:
+        base = host.split('.')
+        if base:
+            return base[0].capitalize()
+    return 'Loja parceira'
 
 
 def _get_meta_content(soup, selector):
@@ -500,13 +532,14 @@ def vitrine_promocoes():
             'titulo': promo.titulo,
             'imagem': promo.imagem,
             'slug': promo.slug,
+            'loja_nome': extrair_loja_nome(promo.link_afiliado),
             'data_publicacao': promo.data_publicacao,
             'preco_final': info['preco_final'],
             'preco_original': info['preco_original'],
             'desconto_texto': info['desconto_texto'],
             'cupom_nome': info['cupom_nome'],
         })
-    return render_template('promotions.html', promocoes=promocoes)
+    return render_template('promotions.html', promocoes=promocoes, whatsapp_group_url=WHATSAPP_GROUP_URL)
 
 
 @app.route('/promocoes/<slug>')
@@ -522,6 +555,7 @@ def detalhe_promocao(slug):
         'titulo': promocao.titulo,
         'imagem': promocao.imagem,
         'slug': promocao.slug,
+        'loja_nome': extrair_loja_nome(promocao.link_afiliado),
         'link_afiliado': promocao.link_afiliado,
         'data_publicacao': promocao.data_publicacao,
         'expira_em': promocao.expira_em,
@@ -530,7 +564,7 @@ def detalhe_promocao(slug):
         'desconto_texto': info['desconto_texto'],
         'cupom_nome': info['cupom_nome'],
     }
-    return render_template('promotion_detail.html', promocao=promo_view)
+    return render_template('promotion_detail.html', promocao=promo_view, whatsapp_group_url=WHATSAPP_GROUP_URL)
 
 
 @app.route('/r/<int:promocao_id>')

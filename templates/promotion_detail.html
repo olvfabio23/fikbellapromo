@@ -6,13 +6,14 @@
     <title>{{ promocao.titulo }} - Fikbella</title>
     <style>
         :root {
-            --bg: #f4f7f1;
+            --bg: #f3f1f8;
             --panel: #ffffff;
-            --ink: #1e241e;
-            --muted: #647267;
-            --brand: #2d7a5e;
-            --brand-strong: #1f624a;
-            --line: #dbe7dc;
+            --ink: #1e2330;
+            --muted: #616a80;
+            --brand: #b88ad8;
+            --brand-strong: #925cc0;
+            --line: #e0d8ec;
+            --green: #47b857;
         }
 
         * { box-sizing: border-box; }
@@ -21,8 +22,8 @@
             margin: 0;
             font-family: Cambria, Georgia, serif;
             background:
-                linear-gradient(180deg, #eef8ef 0%, rgba(238, 248, 239, 0) 38%),
-                radial-gradient(circle at 90% 10%, #dff0e1 0%, rgba(223, 240, 225, 0) 40%),
+                linear-gradient(180deg, #f5effb 0%, rgba(245, 239, 251, 0) 38%),
+                radial-gradient(circle at 90% 10%, #e8f6ea 0%, rgba(232, 246, 234, 0) 40%),
                 var(--bg);
             color: var(--ink);
         }
@@ -55,6 +56,18 @@
             display: grid;
             gap: 0.9rem;
             align-content: start;
+        }
+
+        .loja-chip {
+            margin: 0;
+            width: fit-content;
+            padding: 0.2rem 0.5rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            border: 1px solid #d7c4ea;
+            background: #f8f3ff;
+            color: #67428f;
+            font-weight: 700;
         }
 
         h1 {
@@ -104,6 +117,37 @@
             font-weight: 700;
         }
 
+        .wa-box {
+            border: 1px solid #c3e8c9;
+            background: #f2fff5;
+            border-radius: 14px;
+            padding: 0.9rem;
+            display: grid;
+            gap: 0.6rem;
+        }
+
+        .wa-box h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #1d5e2b;
+        }
+
+        .wa-box p {
+            margin: 0;
+            font-size: 0.9rem;
+            color: #2d6d3a;
+        }
+
+        .wa-btn {
+            text-decoration: none;
+            text-align: center;
+            border-radius: 999px;
+            padding: 0.68rem 0.9rem;
+            background: var(--green);
+            color: #fff;
+            font-weight: 700;
+        }
+
         .back {
             text-decoration: none;
             color: var(--ink);
@@ -127,6 +171,7 @@
         </section>
 
         <section class="card content">
+            <p class="loja-chip">Promocao de loja: {{ promocao.loja_nome }}</p>
             <h1>{{ promocao.titulo }}</h1>
             {% if promocao.preco_original %}
                 <p class="old-price">{{ promocao.preco_original }}</p>
@@ -137,7 +182,14 @@
             {% endif %}
             <p class="meta">Publicada em {{ promocao.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</p>
             <p class="meta">Expira em {{ promocao.expira_em.strftime('%d/%m/%Y %H:%M') }}</p>
-            <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}">Ir para oferta afiliada</a>
+            <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}">Pegar promocao</a>
+
+            <div class="wa-box">
+                <h3>Gostou dessa promocao?</h3>
+                <p>Entre agora no nosso grupo e receba ofertas novas todos os dias.</p>
+                <a class="wa-btn" href="{{ whatsapp_group_url }}" target="_blank" rel="noopener">Entrar no grupo de WhatsApp</a>
+            </div>
+
             <a class="back" href="{{ url_for('vitrine_promocoes') }}">Voltar para vitrine</a>
         </section>
     </main>

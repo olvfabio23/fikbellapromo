@@ -16,6 +16,16 @@ from urllib.parse import urlparse
 from urllib.parse import urljoin
 
 try:
+    from gql import Client, gql
+    from gql.transport.requests import RequestsHTTPTransport
+    GQL_AVAILABLE = True
+except ModuleNotFoundError:
+    Client = None
+    gql = None
+    RequestsHTTPTransport = None
+    GQL_AVAILABLE = False
+
+try:
     from scraper import ProductScraper
     from flyer_generator import FlyerGenerator
     FLYER_MODULES_AVAILABLE = True
@@ -42,6 +52,10 @@ PROMOTION_TABLE_NAME = os.getenv('PROMOTION_TABLE_NAME', 'fikbella_promocoes')
 PROMOTION_DB_SCHEMA = os.getenv('PROMOTION_DB_SCHEMA', '')
 AUTO_INIT_DB = os.getenv('AUTO_INIT_DB', 'false').lower() == 'true'
 WHATSAPP_GROUP_URL = os.getenv('WHATSAPP_GROUP_URL', 'https://chat.whatsapp.com/LSlj4MmAyMODcyW7us4vCY')
+SHOPEE_GRAPHQL_URL = os.getenv('SHOPEE_GRAPHQL_URL', '').strip()
+SHOPEE_APP_ID = os.getenv('SHOPEE_APP_ID', '').strip()
+SHOPEE_APP_SECRET = os.getenv('SHOPEE_APP_SECRET', '').strip()
+SHOPEE_GRAPHQL_QUERY = os.getenv('SHOPEE_GRAPHQL_QUERY', '').strip()
 
 COUPONS_FILE = 'saved_coupons.json'
 ADMIN_COUPONS_FILE = 'saved_admin_coupons.json'
@@ -119,6 +133,7 @@ def extrair_loja_nome(link):
         'mercadolivre': 'Mercado Livre',
         'mercadolibre': 'Mercado Livre',
         'mlb': 'Mercado Livre',
+            'meli': 'Mercado Livre',
         'shopee': 'Shopee',
         'amazon': 'Amazon',
         'magazineluiza': 'Magalu',
@@ -167,6 +182,7 @@ def extrair_loja_simbolo(link):
         'amazon': '🛒',
         'magazineluiza': '🔵',
         'magalu': '🔵',
+        'meli': '🟡',
         'aliexpress': '🔴',
         'shein': '⚫',
         'netshoes': '🏃',
@@ -190,6 +206,7 @@ def extrair_loja_logo(link):
         'mercadolivre': 'mercado_livre.png',
         'mercadolibre': 'mercado_livre.png',
         'mlb': 'mercado_livre.png',
+            'meli': 'mercado_livre.png',
         'shopee': 'shopee.png',
         'magazineluiza': 'Magalu.png',
         'magalu': 'Magalu.png',
@@ -222,6 +239,79 @@ def formatar_data_br(dt_utc):
         return dt_sp.strftime('%d/%m/%Y %H:%M')
     except Exception:
         return dt_utc.strftime('%d/%m/%Y %H:%M')
+
+
+def _agora_utc():
+    return datetime.utcnow()
+
+
+def _parse_iso_datetime(value):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(pytz.utc).replace(tzinfo=None)
+        return parsed
+    except Exception:
+        return None
+
+
+def _salvar_admin_coupons(coupons):
+    with open(ADMIN_COUPONS_FILE, 'w', encoding='utf-8') as file_handle:
+        json.dump(coupons, file_handle, ensure_ascii=False, indent=2)
+
+
+def _normalizar_admin_coupon(coupon, referencia_utc=None):
+    if not isinstance(coupon, dict):
+        return None
+
+    nome = (coupon.get('nome') or '').strip().upper()
+    desconto_tipo = (coupon.get('tipo') or '').strip().lower()
+    try:
+        valor = float(coupon.get('valor'))
+    except (TypeError, ValueError):
+        return None
+
+    if not nome or desconto_tipo not in {'percentual', 'fixo'} or valor <= 0:
+        return None
+
+    created_at = _parse_iso_datetime(coupon.get('created_at')) or referencia_utc or _agora_utc()
+    expires_at = _parse_iso_datetime(coupon.get('expires_at'))
+    if expires_at is None:
+        expires_at = created_at + timedelta(days=PROMOTION_TTL_DAYS)
+
+    if expires_at <= _agora_utc():
+        return None
+
+    return {
+        'nome': nome,
+        'tipo': desconto_tipo,
+        'valor': valor,
+        'created_at': created_at.isoformat(),
+        'expires_at': expires_at.isoformat(),
+    }
+
+
+def purgar_admin_coupons_expirados():
+    coupons = load_admin_coupons()
+    ativos = []
+    alterado = False
+    agora = _agora_utc()
+
+    for coupon in coupons:
+        normalizado = _normalizar_admin_coupon(coupon, referencia_utc=agora)
+        if normalizado is None:
+            alterado = True
+            continue
+        ativos.append(normalizado)
+        if normalizado != coupon:
+            alterado = True
+
+    if alterado:
+        _salvar_admin_coupons(ativos)
+
+    return ativos
 
 
 def titulo_do_path_url(product_url):
@@ -477,7 +567,20 @@ def load_admin_coupons():
             with open(ADMIN_COUPONS_FILE, 'r', encoding='utf-8') as file_handle:
                 data = json.load(file_handle)
             if isinstance(data, list):
-                return data
+                coupons = []
+                alterado = False
+                agora = _agora_utc()
+                for coupon in data:
+                    normalizado = _normalizar_admin_coupon(coupon, referencia_utc=agora)
+                    if normalizado is None:
+                        alterado = True
+                        continue
+                    coupons.append(normalizado)
+                    if normalizado != coupon:
+                        alterado = True
+                if alterado:
+                    _salvar_admin_coupons(coupons)
+                return coupons
         except Exception:
             return []
     return []
@@ -499,17 +602,218 @@ def save_admin_coupon(nome, desconto_tipo, desconto_valor):
 
     coupons = load_admin_coupons()
     coupons = [c for c in coupons if (c.get('nome') or '').upper() != nome_limpo]
+    created_at = _agora_utc()
     coupons.insert(0, {
         'nome': nome_limpo,
         'tipo': desconto_tipo,
         'valor': valor,
+        'created_at': created_at.isoformat(),
+        'expires_at': (created_at + timedelta(days=PROMOTION_TTL_DAYS)).isoformat(),
     })
     coupons = coupons[:30]
 
-    with open(ADMIN_COUPONS_FILE, 'w', encoding='utf-8') as file_handle:
-        json.dump(coupons, file_handle, ensure_ascii=False, indent=2)
+    _salvar_admin_coupons(coupons)
 
     return coupons
+
+
+def _shopee_extrair_ids(product_url):
+    texto = product_url or ''
+    patterns = [
+        r'i\.(?P<shopid>\d+)\.(?P<itemid>\d+)',
+        r'(?P<shopid>\d+)\.(?P<itemid>\d+)',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, texto)
+        if match:
+            return match.group('shopid'), match.group('itemid')
+    return '', ''
+
+
+def _shopee_graphql_default_query():
+    return '''
+query ShopeeProduct($shopid: String!, $itemid: String!) {
+  product(shopid: $shopid, itemid: $itemid) {
+    title
+    name
+    item_name
+    image
+    images
+    cover_image
+    thumbnail
+    price
+    sale_price
+    original_price
+    price_before_discount
+    shop_name
+  }
+}
+'''
+
+
+def _first_nonempty(*values):
+    for value in values:
+        if isinstance(value, list):
+            if value:
+                candidate = _first_nonempty(*value)
+                if candidate:
+                    return candidate
+        elif isinstance(value, dict):
+            candidate = _first_nonempty(*value.values())
+            if candidate:
+                return candidate
+        elif value not in (None, '', []):
+            text = str(value).strip()
+            if text:
+                return text
+    return ''
+
+
+def _normalizar_preco_shopee(valor):
+    if valor in (None, ''):
+        return ''
+    if isinstance(valor, (int, float)):
+        return _format_preco_br(float(valor))
+    texto = str(valor).strip()
+    if not texto:
+        return ''
+    if texto.lower().startswith('r$'):
+        return _formatar_preco(texto)
+    try:
+        return _format_preco_br(float(texto.replace(',', '.')))
+    except Exception:
+        return _formatar_preco(texto)
+
+
+def _extrair_dados_shopee_resposta(data, product_url):
+    candidatos = []
+
+    def coletar(obj):
+        if isinstance(obj, dict):
+            campos = [
+                obj.get('product'), obj.get('item'), obj.get('productDetail'),
+                obj.get('itemDetail'), obj.get('shopeeProduct'), obj.get('data'),
+            ]
+            for campo in campos:
+                if isinstance(campo, dict):
+                    candidatos.append(campo)
+                    coletar(campo)
+                elif isinstance(campo, list):
+                    for item in campo:
+                        coletar(item)
+            for value in obj.values():
+                coletar(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                coletar(item)
+
+    coletar(data)
+    candidatos = [c for c in candidatos if isinstance(c, dict)]
+    candidatos.insert(0, data if isinstance(data, dict) else {})
+
+    for candidato in candidatos:
+        titulo = _first_nonempty(
+            candidato.get('title'),
+            candidato.get('name'),
+            candidato.get('item_name'),
+            candidato.get('product_name'),
+        )
+
+        imagem = _first_nonempty(
+            candidato.get('image'),
+            candidato.get('images'),
+            candidato.get('cover_image'),
+            candidato.get('thumbnail'),
+            candidato.get('image_url'),
+        )
+
+        if isinstance(candidato.get('images'), list) and candidato.get('images'):
+            imagem = candidato.get('images')[0]
+
+        preco_atual = _first_nonempty(
+            candidato.get('price'),
+            candidato.get('sale_price'),
+            candidato.get('current_price'),
+            candidato.get('price_current'),
+        )
+
+        preco_original = _first_nonempty(
+            candidato.get('original_price'),
+            candidato.get('price_before_discount'),
+            candidato.get('retail_price'),
+        )
+
+        if titulo or imagem or preco_atual or preco_original:
+            return {
+                'titulo': titulo,
+                'imagem': imagem,
+                'preco_atual': _normalizar_preco_shopee(preco_atual),
+                'preco_original': _normalizar_preco_shopee(preco_original),
+                'link_afiliado': product_url,
+            }
+
+    return {}
+
+
+def extrair_dados_shopee_graphql(product_url):
+    if not SHOPEE_GRAPHQL_URL:
+        return {}
+
+    shopid, itemid = _shopee_extrair_ids(product_url)
+    if not shopid or not itemid:
+        return {}
+
+    headers = {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/126.0.0.0 Safari/537.36'
+        ),
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Content-Type': 'application/json',
+    }
+
+    if SHOPEE_APP_ID:
+        headers['X-App-Id'] = SHOPEE_APP_ID
+        headers['X-Shopee-App-Id'] = SHOPEE_APP_ID
+    if SHOPEE_APP_SECRET:
+        headers['X-App-Secret'] = SHOPEE_APP_SECRET
+        headers['X-Shopee-App-Secret'] = SHOPEE_APP_SECRET
+
+    variables = {'shopid': shopid, 'itemid': itemid}
+    query_text = SHOPEE_GRAPHQL_QUERY or _shopee_graphql_default_query()
+
+    try:
+        if GQL_AVAILABLE:
+            transport = RequestsHTTPTransport(
+                url=SHOPEE_GRAPHQL_URL,
+                headers=headers,
+                verify=True,
+                retries=2,
+                timeout=20,
+            )
+            client = Client(transport=transport, fetch_schema_from_transport=False)
+            resultado = client.execute(gql(query_text), variable_values=variables)
+        else:
+            response = requests.post(
+                SHOPEE_GRAPHQL_URL,
+                json={'query': query_text, 'variables': variables},
+                headers=headers,
+                timeout=20,
+            )
+            response.raise_for_status()
+            resultado = response.json()
+    except Exception:
+        return {}
+
+    if isinstance(resultado, dict) and resultado.get('errors'):
+        return {}
+
+    dados = resultado.get('data') if isinstance(resultado, dict) else resultado
+    if dados is None:
+        dados = resultado
+
+    return _extrair_dados_shopee_resposta(dados, product_url)
 
 
 def _extrair_do_json_ld(soup):
@@ -577,6 +881,12 @@ def extrair_dados_produto(product_url):
     }
 
     final_url, html_text = _expand_short_url(product_url, headers)
+
+    shopee_dados = {}
+    host = (urlparse(final_url or product_url).netloc or '').lower()
+    if 'shopee' in host:
+        shopee_dados = extrair_dados_shopee_graphql(final_url or product_url)
+
     if not html_text:
         try:
             resp = requests.get(final_url, headers=headers, timeout=20)
@@ -605,6 +915,12 @@ def extrair_dados_produto(product_url):
         titulo = titulo or jsonld_titulo
         preco_atual = preco_atual or jsonld_preco
         imagem = imagem or jsonld_imagem
+
+    if shopee_dados:
+        titulo = shopee_dados.get('titulo') or titulo
+        imagem = shopee_dados.get('imagem') or imagem
+        preco_atual = shopee_dados.get('preco_atual') or preco_atual
+        preco_original = shopee_dados.get('preco_original') or preco_original
 
     prices_in_text = _extract_price_candidates(html_text)
 
@@ -976,6 +1292,9 @@ def criar_promocao():
         preco = calculo['preco_final']
         preco_original = calculo['preco_original']
         desconto_texto = calculo['desconto_texto']
+
+        if cupom_nome:
+            save_admin_coupon(cupom_nome, desconto_tipo, desconto_valor)
 
     preco_armazenado = build_preco_storage(
         preco_final=preco,

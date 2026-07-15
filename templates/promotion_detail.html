@@ -105,9 +105,10 @@
 
         .old-price {
             margin: 0;
-            color: var(--muted);
+            color: #b31919;
             text-decoration: line-through;
             font-size: 0.95rem;
+            font-weight: 900;
         }
 
         .new-price {
@@ -228,6 +229,92 @@
             font-weight: 700;
         }
 
+        .footer {
+            grid-column: 1 / -1;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 1.2rem;
+            text-align: center;
+            display: grid;
+            gap: 0.9rem;
+        }
+
+        .social-title {
+            margin: 0;
+            color: #58458a;
+            font-size: 0.95rem;
+        }
+
+        .social-row {
+            display: flex;
+            justify-content: center;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+        }
+
+        .social-link {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            background: #0b0b0b;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            font-size: 1.35rem;
+            font-weight: 900;
+        }
+
+        .trust-row {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-size: 0.82rem;
+            color: #3b3b3b;
+            font-weight: 700;
+        }
+
+        .shield {
+            width: 34px;
+            height: 34px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #e9f8ee;
+            color: #2a9d4b;
+            font-size: 1rem;
+        }
+
+        .legal-links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            color: var(--muted);
+        }
+
+        .legal-links a {
+            color: #5b4b82;
+            text-decoration: none;
+        }
+
+        .legal-text {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
         @media (max-width: 980px) {
             .wrap {
                 grid-template-columns: 1fr;
@@ -280,7 +367,7 @@
                 </div>
             {% endif %}
 
-            <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}">Pegar promocao</a>
+            <a class="cta" href="{{ url_for('redirect_afiliado', promocao_id=promocao.id) }}" target="_blank" rel="noopener">Pegar promocao</a>
 
             <p class="meta">Publicado em {{ promocao.data_formatada }}</p>
 
@@ -290,6 +377,23 @@
                 <a class="wa-btn" href="{{ whatsapp_group_url }}" target="_blank" rel="noopener">Entrar no grupo</a>
             </div>
         </aside>
+        <footer class="footer">
+            <p class="social-title">Siga nas redes sociais:</p>
+            <div class="social-row">
+                <a class="social-link" href="https://www.instagram.com/fikbella.fit/" target="_blank" rel="noopener" aria-label="Instagram">IG</a>
+                <a class="social-link" href="https://www.instagram.com/fikbella.fit/" target="_blank" rel="noopener" aria-label="Instagram">◎</a>
+            </div>
+            <div class="trust-row">
+                <div class="trust-item"><span class="shield">🛡️</span><span>SITE PROTEGIDO<br><small>CERTIFICADO SSL</small></span></div>
+                <div class="trust-item"><span class="shield">🟢</span><span>GOOGLE<br><small>SAFE BROWSING</small></span></div>
+            </div>
+            <div class="legal-links">
+                <a href="#" onclick="return false;">Termos de Serviço</a>
+                <span>|</span>
+                <a href="#" onclick="return false;">Política de Privacidade</a>
+            </div>
+            <p class="legal-text">©2026 Fikbella Promo. Todos os direitos reservados. A presença de marcas de terceiros não significa relação comercial com essas empresas. Quando você compra através de links em Fikbella Promo, podemos receber uma comissão.</p>
+        </footer>
     </main>
     <script>
         function copiarCupom(codigo) {

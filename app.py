@@ -336,6 +336,9 @@ def titulo_do_path_url(product_url):
         return ''
 
     bruto = max(candidatos, key=len)
+    bruto = re.sub(r'-i\.\d+\.\d+.*$', '', bruto, flags=re.IGNORECASE)
+    bruto = re.sub(r'_(?:JM|JP|MLB\d+).*$', '', bruto, flags=re.IGNORECASE)
+    bruto = re.sub(r'\bMLB\d+\b.*$', '', bruto, flags=re.IGNORECASE)
     bruto = re.sub(r'[-_]+', ' ', bruto)
     bruto = re.sub(r'\s+', ' ', bruto).strip()
     if len(bruto) < 8:
@@ -381,6 +384,7 @@ def _extract_price_candidates(text):
     patterns = [
         r'R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}',
         r'\d{1,3}(?:\.\d{3})*,\d{2}\s*R\$',
+        r'\b\d{1,3}(?:\.\d{3})*\s*reais?(?:\s+com\s+\d{1,2}\s+centavos?)?\b',
         r'"price"\s*[:=]\s*"?(\d+(?:\.\d{1,2})?)"?',
         r'"salePrice"\s*[:=]\s*"?(\d+(?:\.\d{1,2})?)"?',
         r'"bestPrice"\s*[:=]\s*"?(\d+(?:\.\d{1,2})?)"?',
@@ -389,7 +393,16 @@ def _extract_price_candidates(text):
     for pattern in patterns:
         for match in re.findall(pattern, text, flags=re.IGNORECASE):
             raw = match if isinstance(match, str) else str(match)
-            num = _parse_preco_to_float(raw)
+            if 'reais' in raw.lower():
+                moedas = re.search(r'(\d{1,3}(?:\.\d{3})*)\s*reais?(?:\s+com\s+(\d{1,2})\s+centavos?)?', raw, flags=re.IGNORECASE)
+                if moedas:
+                    reais = moedas.group(1).replace('.', '')
+                    centavos = moedas.group(2) or '00'
+                    num = _parse_preco_to_float(f'{reais},{centavos}')
+                else:
+                    num = None
+            else:
+                num = _parse_preco_to_float(raw)
             if num is not None and num > 0:
                 candidates.append(num)
 
@@ -1039,6 +1052,13 @@ def extrair_dados_produto(product_url):
         or _get_meta_content(soup, 'meta[property="product:price:original_amount"]')
     )
 
+    if not preco_atual and html_text:
+        candidatos_preco = _extract_price_candidates(html_text)
+        if candidatos_preco:
+            preco_atual = _format_preco_br(candidatos_preco[0])
+            if not preco_original and len(candidatos_preco) > 1:
+                preco_original = _format_preco_br(candidatos_preco[-1])
+
     if not (titulo and imagem and preco_atual):
         jsonld_titulo, jsonld_preco, jsonld_imagem = _extrair_do_json_ld(soup)
         titulo = titulo or jsonld_titulo
@@ -1120,6 +1140,14 @@ def extrair_dados_produto(product_url):
         'loja_slug': loja_meta['slug'],
         'loja_logo_url': loja_meta['logo_url'],
     }
+
+
+def calcular_base_preco_formulario(preco_final, preco_anuncio):
+    preco_final_texto = (preco_final or '').strip()
+    preco_anuncio_texto = (preco_anuncio or '').strip()
+    if preco_final_texto:
+        return preco_final_texto
+    return preco_anuncio_texto
 
 
 def buscar_promocoes_ativas():
@@ -1404,6 +1432,7 @@ def criar_promocao():
     cupom_nome = (payload.get('cupom_nome') or '').strip().upper()
     imagem = (payload.get('imagem') or '').strip()
     link_afiliado = (payload.get('link_afiliado') or '').strip()
+    preco_base_form = calcular_base_preco_formulario(preco, preco_anuncio)
 
     if not titulo or not preco or not imagem or not link_afiliado:
         return jsonify({'erro': 'Campos obrigatórios: titulo, preco, imagem, link_afiliado.'}), 400
@@ -1413,9 +1442,11 @@ def criar_promocao():
 
     if preco_anuncio:
         preco_original = preco_anuncio
+    elif preco_base_form:
+        preco_original = preco_base_form
 
     if desconto_tipo and desconto_valor:
-        calculo = calcular_desconto(preco_anuncio or preco, desconto_tipo, desconto_valor)
+        calculo = calcular_desconto(preco_base_form or preco, desconto_tipo, desconto_valor)
         if not calculo:
             return jsonify({'erro': 'Desconto inválido para o preço informado.'}), 400
         preco = calculo['preco_final']
@@ -1447,6 +1478,70 @@ def criar_promocao():
     db.session.commit()
 
     return jsonify({'ok': True, 'promocao': promocao.to_dict()}), 201
+
+
+@app.route('/api/admin/promocoes/<int:promocao_id>', methods=['GET'])
+def obter_promocao_admin(promocao_id):
+    validar_admin_token()
+    promocao = Promocao.query.get_or_404(promocao_id)
+    info = parse_preco_info(promocao.preco)
+    return jsonify({
+        'ok': True,
+        'promocao': {
+            'id': promocao.id,
+            'titulo': promocao.titulo,
+            'preco': info['preco_final'],
+            'preco_anuncio': info['preco_original'] or info['preco_final'],
+            'imagem': promocao.imagem,
+            'link_afiliado': promocao.link_afiliado,
+            'desconto_texto': info['desconto_texto'],
+            'cupom_nome': info['cupom_nome'],
+        }
+    })
+
+
+@app.route('/api/admin/promocoes/<int:promocao_id>', methods=['PUT', 'POST'])
+def atualizar_promocao(promocao_id):
+    validar_admin_token()
+    promocao = Promocao.query.get_or_404(promocao_id)
+    payload = request.get_json(silent=True) or request.form
+
+    titulo = (payload.get('titulo') or '').strip()
+    preco = (payload.get('preco') or '').strip()
+    preco_anuncio = (payload.get('preco_anuncio') or '').strip()
+    desconto_tipo = (payload.get('desconto_tipo') or '').strip().lower()
+    desconto_valor = (payload.get('desconto_valor') or '').strip()
+    cupom_nome = (payload.get('cupom_nome') or '').strip().upper()
+    imagem = (payload.get('imagem') or '').strip()
+    link_afiliado = (payload.get('link_afiliado') or '').strip()
+
+    if not titulo or not preco or not imagem or not link_afiliado:
+        return jsonify({'erro': 'Campos obrigatórios: titulo, preco, imagem, link_afiliado.'}), 400
+
+    preco_base_form = calcular_base_preco_formulario(preco, preco_anuncio)
+    preco_original = preco_anuncio or preco_base_form
+    desconto_texto = ''
+
+    if desconto_tipo and desconto_valor:
+        calculo = calcular_desconto(preco_base_form or preco, desconto_tipo, desconto_valor)
+        if not calculo:
+            return jsonify({'erro': 'Desconto inválido para o preço informado.'}), 400
+        preco = calculo['preco_final']
+        preco_original = calculo['preco_original']
+        desconto_texto = calculo['desconto_texto']
+
+    promocao.titulo = titulo
+    promocao.preco = build_preco_storage(
+        preco_final=preco,
+        preco_original=preco_original,
+        desconto_texto=desconto_texto,
+        cupom_nome=cupom_nome,
+    )
+    promocao.imagem = imagem
+    promocao.link_afiliado = link_afiliado
+
+    db.session.commit()
+    return jsonify({'ok': True, 'promocao': promocao.to_dict()})
 
 
 @app.route('/api/admin/promocoes/extract', methods=['POST'])

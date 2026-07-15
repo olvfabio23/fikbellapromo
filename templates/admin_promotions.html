@@ -285,10 +285,11 @@
                 <input type="hidden" id="desconto_tipo" name="desconto_tipo">
                 <input type="hidden" id="desconto_valor" name="desconto_valor">
                 <input type="hidden" id="cupom_nome" name="cupom_nome">
+                <input type="hidden" id="editing_id" name="editing_id">
 
                 <div class="actions">
                     <button class="ghost" type="button" id="btn-autofill">Preencher pelo link</button>
-                    <button class="primary" type="submit">Salvar promocao</button>
+                    <button class="primary" type="submit" id="btn-submit-promocao">Salvar promocao</button>
                     <button class="ghost" type="button" id="btn-cleanup">Executar limpeza agora</button>
                 </div>
             </form>
@@ -327,7 +328,10 @@
                             <td>{{ p.data_publicacao.strftime('%d/%m/%Y %H:%M') }}</td>
                             <td>{{ p.expira_em.strftime('%d/%m/%Y %H:%M') }}</td>
                             <td>{{ p.total_cliques }}</td>
-                            <td><button class="danger" onclick="excluir({{ p.id }})">Excluir</button></td>
+                            <td>
+                                <button class="ghost" type="button" onclick="editar({{ p.id }})">Editar</button>
+                                <button class="danger" onclick="excluir({{ p.id }})">Excluir</button>
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -338,6 +342,7 @@
     <script>
         const token = new URLSearchParams(window.location.search).get('token') || '';
         const msgEl = document.getElementById('msg');
+        const submitBtn = document.getElementById('btn-submit-promocao');
         let coupons = [];
         let activeCoupon = null;
 
@@ -396,6 +401,7 @@
         }
 
         function applyCouponPreview() {
+            const precoFinalField = document.getElementById('preco').value.trim();
             const precoAnuncio = document.getElementById('preco_anuncio').value.trim();
             const precoInput = document.getElementById('preco');
             const preview = document.getElementById('preco-preview');
@@ -403,7 +409,7 @@
             const newEl = document.getElementById('preview-new');
             const badgeEl = document.getElementById('preview-discount');
 
-            const base = parseBrValue(precoAnuncio);
+            const base = parseBrValue(precoFinalField) || parseBrValue(precoAnuncio);
             if (!Number.isFinite(base)) {
                 preview.style.display = 'none';
                 return;
@@ -477,8 +483,10 @@
             const formData = new FormData(e.target);
             formData.append('token', token);
 
-            const resp = await fetch('/api/admin/promocoes', {
-                method: 'POST',
+            const editingId = document.getElementById('editing_id').value.trim();
+            const endpoint = editingId ? `/api/admin/promocoes/${editingId}` : '/api/admin/promocoes';
+            const resp = await fetch(endpoint, {
+                method: editingId ? 'POST' : 'POST',
                 body: formData
             });
 
@@ -488,9 +496,38 @@
                 return;
             }
 
-            setMsg('Promocao cadastrada com sucesso. Recarregando...');
+            setMsg(editingId ? 'Promocao atualizada com sucesso. Recarregando...' : 'Promocao cadastrada com sucesso. Recarregando...');
             window.location.reload();
         });
+
+        async function editar(id) {
+            const resp = await fetch('/api/admin/promocoes/' + id + '?token=' + encodeURIComponent(token));
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.ok) {
+                setMsg((data && data.erro) ? data.erro : 'Falha ao carregar promocao para edicao.');
+                return;
+            }
+
+            const promocao = data.promocao || {};
+            document.getElementById('editing_id').value = promocao.id || id;
+            document.getElementById('titulo').value = promocao.titulo || '';
+            document.getElementById('preco_anuncio').value = promocao.preco_anuncio || promocao.preco || '';
+            document.getElementById('preco').value = promocao.preco || '';
+            document.getElementById('imagem').value = promocao.imagem || '';
+            document.getElementById('link_afiliado').value = promocao.link_afiliado || '';
+            document.getElementById('cupom_nome').value = promocao.cupom_nome || '';
+
+            activeCoupon = coupons.find(c => c.nome === (promocao.cupom_nome || '')) || null;
+            if (promocao.cupom_nome) {
+                document.getElementById('coupon-area').style.display = 'block';
+                document.getElementById('coupon-select').value = promocao.cupom_nome;
+            }
+
+            submitBtn.textContent = 'Salvar edição';
+            applyCouponPreview();
+            setMsg('Editando promoção ' + id + '. Faça as alterações e salve.');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
 
         document.getElementById('btn-toggle-cupom').addEventListener('click', () => {
             const area = document.getElementById('coupon-area');

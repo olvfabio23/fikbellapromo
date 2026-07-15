@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Promocoes em destaque - Fikbella Promo</title>
+    <link rel="icon" type="image/png" href="/static/fikbella_logo_final.png">
+    <link rel="shortcut icon" type="image/png" href="/static/fikbella_logo_final.png">
+    <link rel="apple-touch-icon" href="/static/fikbella_logo_final.png">
     <style>
         :root {
             --bg: #f5f1fb;
@@ -56,6 +59,33 @@
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
+        }
+
+        .brand-badge {
+            justify-self: center;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.45rem 0.8rem 0.45rem 0.45rem;
+            border-radius: 999px;
+            border: 1px solid #e8dcf5;
+            background: #fff;
+            box-shadow: 0 8px 18px rgba(71, 40, 109, 0.12);
+        }
+
+        .brand-badge img {
+            width: 52px;
+            height: 52px;
+            border-radius: 999px;
+            border: 2px solid #fff;
+            object-fit: cover;
+            box-shadow: 0 6px 14px rgba(98, 42, 142, 0.26);
+        }
+
+        .brand-badge strong {
+            color: #5c2d8a;
+            letter-spacing: 0.5px;
+            font-size: 0.98rem;
         }
 
         .hero p {
@@ -365,17 +395,22 @@
         }
 
         .social-link {
-            width: 56px;
-            height: 56px;
+            width: 64px;
+            height: 64px;
             border-radius: 999px;
-            background: #0b0b0b;
-            color: #fff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             text-decoration: none;
-            font-size: 1.35rem;
-            font-weight: 900;
+            background: #fff;
+            border: 1px solid #f0d8fd;
+            box-shadow: 0 10px 24px rgba(88, 41, 134, 0.16);
+        }
+
+        .social-link svg {
+            width: 44px;
+            height: 44px;
+            display: block;
         }
 
         .trust-row {
@@ -446,6 +481,10 @@
 <body>
     <main class="container">
         <section class="hero">
+            <div class="brand-badge">
+                <img src="/static/fikbella_logo_final.png" alt="Fikbella Promo">
+                <strong>FIKBELLA PROMO</strong>
+            </div>
             <div>
                 <h1>Promoções em destaque</h1>
                 <p>Ofertas atualizadas com validade automática de 5 dias.</p>
@@ -465,12 +504,12 @@
 
         {% if lojas %}
             <section class="stores-bar">
-                <a class="store-filter {% if not loja_atual %}active{% endif %}" href="{{ url_for('vitrine_promocoes') }}">
+                <a class="store-filter {% if not loja_atual %}active{% endif %}" href="{{ url_for('vitrine_promocoes') }}" target="_blank" rel="noopener">
                     <span>✨</span>
                     <span>Todas</span>
                 </a>
                 {% for loja in lojas %}
-                    <a class="store-filter {% if loja_atual and loja.slug == loja_atual.slug %}active{% endif %}" href="{{ url_for('promocoes_por_loja', loja_slug=loja.slug) }}">
+                    <a class="store-filter {% if loja_atual and loja.slug == loja_atual.slug %}active{% endif %}" href="{{ url_for('promocoes_por_loja', loja_slug=loja.slug) }}" target="_blank" rel="noopener">
                         {% if loja.logo_url %}<img src="{{ loja.logo_url }}" alt="{{ loja.nome }}">{% else %}<span>{{ loja.simbolo }}</span>{% endif %}
                         <span>{{ loja.nome }}</span>
                     </a>
@@ -484,7 +523,7 @@
                     <article class="card">
                         <div class="media-wrap">
                             <img src="{{ promocao.imagem }}" alt="{{ promocao.titulo }}" loading="lazy">
-                            <a class="store-chip" href="{{ url_for('promocoes_por_loja', loja_slug=promocao.loja_slug) }}">
+                            <a class="store-chip" href="{{ url_for('promocoes_por_loja', loja_slug=promocao.loja_slug) }}" target="_blank" rel="noopener">
                                 {% if promocao.loja_logo_url %}<img src="{{ promocao.loja_logo_url }}" alt="{{ promocao.loja_nome }}">{% else %}<span>{{ promocao.loja_simbolo }}</span>{% endif %}
                                 <span>{{ promocao.loja_nome }}</span>
                             </a>
@@ -534,8 +573,22 @@
         <footer class="footer">
             <p class="social-title">Siga nas redes sociais:</p>
             <div class="social-row">
-                <a class="social-link" href="https://www.instagram.com/fikbella.fit/" target="_blank" rel="noopener" aria-label="Instagram">IG</a>
-                <a class="social-link" href="https://www.instagram.com/fikbella.fit/" target="_blank" rel="noopener" aria-label="Instagram">◎</a>
+                <a class="social-link" href="https://www.instagram.com/fikbella.fit/" target="_blank" rel="noopener" aria-label="Instagram">
+                    <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="igGradientVitrine" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#f58529"/>
+                                <stop offset="35%" stop-color="#dd2a7b"/>
+                                <stop offset="70%" stop-color="#8134af"/>
+                                <stop offset="100%" stop-color="#515bd4"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="12" cy="12" r="11" fill="url(#igGradientVitrine)"/>
+                        <rect x="7" y="7" width="10" height="10" rx="3" fill="none" stroke="#fff" stroke-width="1.9"/>
+                        <circle cx="12" cy="12" r="2.5" fill="none" stroke="#fff" stroke-width="1.9"/>
+                        <circle cx="15.9" cy="8.3" r="1" fill="#fff"/>
+                    </svg>
+                </a>
             </div>
             <div class="trust-row">
                 <div class="trust-item"><span class="shield">🛡️</span><span>SITE PROTEGIDO<br><small>CERTIFICADO SSL</small></span></div>

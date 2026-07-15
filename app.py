@@ -652,6 +652,7 @@ def _shopee_extrair_ids(product_url):
     patterns = [
         r'i\.(?P<shopid>\d+)\.(?P<itemid>\d+)',
         r'(?P<shopid>\d+)\.(?P<itemid>\d+)',
+        r'/(?P<shopid>\d{6,})/(?P<itemid>\d{6,})',
     ]
     for pattern in patterns:
         match = re.search(pattern, texto)
@@ -722,6 +723,19 @@ def _normalizar_preco_shopee(valor):
         return _format_preco_br(float(texto.replace(',', '.')))
     except Exception:
         return _formatar_preco(texto)
+
+
+def _normalizar_valor_centavos_shopee(valor):
+    if valor in (None, ''):
+        return ''
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return _normalizar_preco_shopee(valor)
+
+    if numero > 100000:
+        numero = numero / 100000.0
+    return _format_preco_br(numero)
 
 
 def _extrair_dados_shopee_resposta(data, product_url):
@@ -855,6 +869,64 @@ def extrair_dados_shopee_graphql(product_url):
     return _extrair_dados_shopee_resposta(dados, product_url)
 
 
+def extrair_dados_shopee_api(product_url):
+    shopid, itemid = _shopee_extrair_ids(product_url)
+    if not shopid or not itemid:
+        return {}
+
+    headers = {
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/126.0.0.0 Safari/537.36'
+        ),
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept': 'application/json,text/plain,*/*',
+        'Referer': f'https://shopee.com.br/product/{shopid}/{itemid}',
+    }
+
+    try:
+        response = requests.get(
+            f'https://shopee.com.br/api/v4/item/get?itemid={itemid}&shopid={shopid}',
+            headers=headers,
+            timeout=20,
+        )
+        if response.status_code == 403:
+            return {}
+        response.raise_for_status()
+        payload = response.json() if response.content else {}
+    except Exception:
+        return {}
+
+    item = (payload or {}).get('data') or {}
+    if not isinstance(item, dict) or not item:
+        return {}
+
+    titulo = _first_nonempty(item.get('name'), item.get('item_name'))
+    preco_atual = _normalizar_valor_centavos_shopee(item.get('price_min') or item.get('price'))
+    preco_original = _normalizar_valor_centavos_shopee(item.get('price_before_discount'))
+
+    imagem = ''
+    image_hash = _first_nonempty(item.get('image'), item.get('images'))
+    if image_hash:
+        image_hash = str(image_hash).strip()
+        if image_hash.startswith('http://') or image_hash.startswith('https://'):
+            imagem = image_hash
+        else:
+            imagem = f'https://cf.shopee.com.br/file/{image_hash}'
+
+    if not (titulo or preco_atual or imagem):
+        return {}
+
+    return {
+        'titulo': titulo,
+        'imagem': imagem,
+        'preco_atual': preco_atual,
+        'preco_original': preco_original,
+        'link_afiliado': product_url,
+    }
+
+
 def _extrair_do_json_ld(soup):
     titulo = ''
     preco = ''
@@ -905,6 +977,28 @@ def _extrair_do_json_ld(soup):
 
 
 def _extrair_shopee_por_html(soup, html_text, base_url):
+    shopid, itemid = _shopee_extrair_ids(base_url)
+    if shopid and itemid:
+        api_data = extrair_dados_shopee_api(base_url)
+        if api_data:
+            return api_data
+
+    match_nome = re.search(r'"item_name"\s*:\s*"([^"]{8,})"', html_text or '', flags=re.IGNORECASE)
+    match_img = re.search(r'"image"\s*:\s*"([a-zA-Z0-9]{10,})"', html_text or '', flags=re.IGNORECASE)
+    match_price = re.search(r'"price"\s*:\s*(\d+)', html_text or '', flags=re.IGNORECASE)
+    match_price_old = re.search(r'"price_before_discount"\s*:\s*(\d+)', html_text or '', flags=re.IGNORECASE)
+    if match_nome or match_img or match_price:
+        imagem = ''
+        if match_img:
+            imagem = f"https://cf.shopee.com.br/file/{match_img.group(1)}"
+        return {
+            'titulo': match_nome.group(1).strip() if match_nome else '',
+            'preco_atual': _normalizar_valor_centavos_shopee(match_price.group(1)) if match_price else '',
+            'preco_original': _normalizar_valor_centavos_shopee(match_price_old.group(1)) if match_price_old else '',
+            'imagem': imagem,
+            'link_afiliado': base_url,
+        }
+
     for anchor in soup.select('a[href]'):
         href = anchor.get('href') or ''
         texto = _candidate_text(anchor)
@@ -1022,6 +1116,8 @@ def extrair_dados_produto(product_url):
     host = (urlparse(final_url or product_url).netloc or '').lower()
     if 'shopee' in host:
         shopee_dados = extrair_dados_shopee_graphql(final_url or product_url)
+        if not shopee_dados:
+            shopee_dados = extrair_dados_shopee_api(final_url or product_url)
 
     if not html_text:
         try:

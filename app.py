@@ -733,6 +733,8 @@ def _normalizar_valor_centavos_shopee(valor):
     except (TypeError, ValueError):
         return _normalizar_preco_shopee(valor)
 
+    if numero <= 0:
+        return ''
     if numero > 100000:
         numero = numero / 100000.0
     return _format_preco_br(numero)

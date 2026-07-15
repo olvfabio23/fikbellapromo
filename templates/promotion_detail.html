@@ -122,11 +122,18 @@
             margin: 0;
             width: fit-content;
             border-radius: 999px;
-            background: #ffe6e6;
-            color: #8e2626;
-            font-size: 0.78rem;
-            font-weight: 700;
-            padding: 0.2rem 0.5rem;
+            background: #ffe1e1;
+            color: #8b1313;
+            font-size: 0.8rem;
+            font-weight: 900;
+            padding: 0.24rem 0.6rem;
+        }
+
+        .economy-note {
+            margin: 0;
+            color: #9d1717;
+            font-weight: 900;
+            font-size: 0.9rem;
         }
 
         .cta {
@@ -257,6 +264,12 @@
 
             {% if promocao.desconto_texto %}
                 <p class="discount">{{ promocao.desconto_texto }}</p>
+            {% elif promocao.preco_original and promocao.preco_original != promocao.preco_final %}
+                <p class="discount">Economia disponível</p>
+            {% endif %}
+
+            {% if promocao.preco_original and promocao.preco_original != promocao.preco_final %}
+                <p class="economy-note">Você economiza ao comprar agora</p>
             {% endif %}
 
             {% if promocao.cupom_nome %}

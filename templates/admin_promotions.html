@@ -90,6 +90,13 @@
             flex-wrap: wrap;
         }
 
+        .coupon-menu {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
         .coupon-pill {
             border: 1px solid var(--line);
             border-radius: 999px;
@@ -249,6 +256,12 @@
 
                     <div id="coupon-area" style="display:none;">
                         <p class="hint" style="margin-bottom:0.5rem;">Escolha um cupom salvo ou cadastre um novo antes de salvar a promocao.</p>
+                        <div class="coupon-menu" style="margin-bottom:0.65rem;">
+                            <select id="coupon-select">
+                                <option value="">Selecionar cupom salvo</option>
+                            </select>
+                            <button class="ghost" type="button" id="btn-aplicar-cupom">Aplicar</button>
+                        </div>
                         <div id="coupon-list" class="coupon-list"></div>
 
                         <div class="mini-grid" style="margin-top:0.7rem;">
@@ -350,7 +363,9 @@
 
         function renderCoupons() {
             const list = document.getElementById('coupon-list');
+            const select = document.getElementById('coupon-select');
             list.innerHTML = '';
+            select.innerHTML = '<option value="">Selecionar cupom salvo</option>';
             coupons.forEach((coupon) => {
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -362,11 +377,22 @@
                 }
                 btn.addEventListener('click', () => {
                     activeCoupon = coupon;
+                    select.value = coupon.nome;
                     applyCouponPreview();
                     renderCoupons();
                 });
                 list.appendChild(btn);
+
+                const option = document.createElement('option');
+                option.value = coupon.nome;
+                const validade = coupon.expires_at ? ` - expira em ${new Date(coupon.expires_at).toLocaleDateString('pt-BR')}` : '';
+                option.textContent = `${coupon.nome} (${suffix})${validade}`;
+                select.appendChild(option);
             });
+
+            if (activeCoupon) {
+                select.value = activeCoupon.nome;
+            }
         }
 
         function applyCouponPreview() {
@@ -503,6 +529,20 @@
             renderCoupons();
             applyCouponPreview();
             setMsg('Cupom salvo com sucesso.');
+        });
+
+        document.getElementById('coupon-select').addEventListener('change', (event) => {
+            activeCoupon = coupons.find(c => c.nome === event.target.value) || null;
+            applyCouponPreview();
+            renderCoupons();
+        });
+
+        document.getElementById('btn-aplicar-cupom').addEventListener('click', () => {
+            const valor = document.getElementById('coupon-select').value;
+            activeCoupon = coupons.find(c => c.nome === valor) || null;
+            applyCouponPreview();
+            renderCoupons();
+            setMsg(activeCoupon ? `Cupom ${activeCoupon.nome} aplicado.` : 'Selecione um cupom salvo.');
         });
 
         document.getElementById('btn-autofill').addEventListener('click', async () => {

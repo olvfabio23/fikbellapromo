@@ -39,31 +39,70 @@
             background: linear-gradient(120deg, #ffffff 0%, #fbf8ff 70%);
             border: 1px solid var(--line);
             border-radius: 18px;
-            padding: 1.1rem;
+            padding: 1.5rem 1.25rem;
             display: grid;
-            grid-template-columns: 1.2fr auto;
             gap: 1rem;
             align-items: center;
+            text-align: center;
         }
 
         .hero h1 {
             margin: 0;
-            font-size: clamp(1.6rem, 3vw, 2.4rem);
+            font-size: clamp(2rem, 4vw, 3rem);
             line-height: 1.1;
+            font-weight: 900;
+            letter-spacing: 0.4px;
+            background: linear-gradient(135deg, #452a6e 0%, #8d57b8 45%, #c14242 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
 
         .hero p {
             margin: 0.35rem 0 0;
             color: var(--muted);
+            font-size: 1rem;
         }
 
         .hero-count {
+            justify-self: center;
             border: 1px solid var(--line);
             border-radius: 999px;
             padding: 0.5rem 0.85rem;
             color: var(--muted);
             background: #fff;
             white-space: nowrap;
+        }
+
+        .hero-cta-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .qr-box {
+            display: grid;
+            gap: 0.4rem;
+            justify-items: center;
+            padding: 0.9rem;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: #fff;
+            box-shadow: 0 10px 24px rgba(59, 43, 87, 0.08);
+        }
+
+        .qr-box img {
+            width: 154px;
+            height: 154px;
+            display: block;
+            border-radius: 12px;
+        }
+
+        .qr-box span {
+            color: var(--muted);
+            font-size: 0.82rem;
+            text-align: center;
         }
 
         .wa-banner {
@@ -203,20 +242,27 @@
 
         .new-price {
             margin: 0;
-            color: #1e6a47;
-            font-size: 1.26rem;
+            color: #154d33;
+            font-size: 1.42rem;
             font-weight: 800;
         }
 
         .discount {
             margin: 0;
             width: fit-content;
-            background: #ffe4e4;
-            color: #8a2727;
+            background: #ffe1e1;
+            color: #8b1313;
             border-radius: 999px;
-            padding: 0.17rem 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 700;
+            padding: 0.24rem 0.6rem;
+            font-size: 0.8rem;
+            font-weight: 900;
+        }
+
+        .economy-note {
+            margin: 0;
+            color: #9d1717;
+            font-weight: 900;
+            font-size: 0.86rem;
         }
 
         .meta {
@@ -314,15 +360,20 @@
     <main class="container">
         <section class="hero">
             <div>
-                <h1>Promocoes em destaque</h1>
-                <p>Ofertas atualizadas com validade automatica de 5 dias.</p>
+                <h1>Promoções em destaque</h1>
+                <p>Ofertas atualizadas com validade automática de 5 dias.</p>
             </div>
             <div class="hero-count">{{ promocoes|length }} oferta(s) ativa(s)</div>
-        </section>
-
-        <section class="wa-banner">
-            <p>🔥 Quer receber promocoes primeiro? Entre agora no grupo VIP do WhatsApp.</p>
-            <a href="{{ whatsapp_group_url }}" target="_blank" rel="noopener">Entrar no WhatsApp</a>
+            <div class="hero-cta-row">
+                <section class="wa-banner">
+                    <p>🔥 Quer receber promoções primeiro? Entre agora no grupo VIP do WhatsApp.</p>
+                    <a href="{{ whatsapp_group_url }}" target="_blank" rel="noopener">Entrar no WhatsApp</a>
+                </section>
+                <div class="qr-box">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={{ whatsapp_group_url|urlencode }}" alt="QR Code do WhatsApp">
+                    <span>Escaneie e entre no grupo</span>
+                </div>
+            </div>
         </section>
 
         {% if lojas %}
@@ -363,6 +414,12 @@
 
                             {% if promocao.desconto_texto %}
                                 <p class="discount">{{ promocao.desconto_texto }}</p>
+                            {% elif promocao.preco_original and promocao.preco_original != promocao.preco_final %}
+                                <p class="discount">Economia disponível</p>
+                            {% endif %}
+
+                            {% if promocao.preco_original and promocao.preco_original != promocao.preco_final %}
+                                <p class="economy-note">Você economiza ao comprar agora</p>
                             {% endif %}
 
                             {% if promocao.cupom_nome %}

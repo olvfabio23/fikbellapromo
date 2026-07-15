@@ -133,7 +133,7 @@ def extrair_loja_nome(link):
         'mercadolivre': 'Mercado Livre',
         'mercadolibre': 'Mercado Livre',
         'mlb': 'Mercado Livre',
-            'meli': 'Mercado Livre',
+        'meli': 'Mercado Livre',
         'shopee': 'Shopee',
         'amazon': 'Amazon',
         'magazineluiza': 'Magalu',
@@ -206,7 +206,7 @@ def extrair_loja_logo(link):
         'mercadolivre': 'mercado_livre.png',
         'mercadolibre': 'mercado_livre.png',
         'mlb': 'mercado_livre.png',
-            'meli': 'mercado_livre.png',
+        'meli': 'mercado_livre.png',
         'shopee': 'shopee.png',
         'magazineluiza': 'Magalu.png',
         'magalu': 'Magalu.png',
@@ -484,6 +484,20 @@ def _format_preco_br(valor):
     return f"R$ {valor:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
 
 
+def _calcular_economia_texto(preco_original, preco_final):
+    original = _parse_preco_to_float(preco_original)
+    final = _parse_preco_to_float(preco_final)
+    if original is None or final is None:
+        return ''
+    if original <= 0 or final >= original:
+        return ''
+
+    economia = ((original - final) / original) * 100.0
+    if economia <= 0:
+        return ''
+    return f'-{economia:.0f}% de economia'
+
+
 def parse_preco_info(preco_armazenado):
     info_padrao = {
         'preco_final': preco_armazenado,
@@ -510,6 +524,9 @@ def parse_preco_info(preco_armazenado):
 
     if not preco_final:
         return info_padrao
+
+    if not desconto_texto and preco_original and preco_original != preco_final:
+        desconto_texto = _calcular_economia_texto(preco_original, preco_final)
 
     return {
         'preco_final': preco_final,
@@ -667,6 +684,15 @@ def _first_nonempty(*values):
             if text:
                 return text
     return ''
+
+
+def _candidate_text(element):
+    if not element:
+        return ''
+    try:
+        return element.get_text(' ', strip=True)
+    except Exception:
+        return str(element).strip()
 
 
 def _normalizar_preco_shopee(valor):
@@ -865,6 +891,103 @@ def _extrair_do_json_ld(soup):
     return titulo, preco, imagem
 
 
+def _extrair_shopee_por_html(soup, html_text, base_url):
+    for anchor in soup.select('a[href]'):
+        href = anchor.get('href') or ''
+        texto = _candidate_text(anchor)
+        if not texto or len(texto) < 16:
+            continue
+
+        url_completa = urljoin(base_url, href)
+        if 'shopee.com.br' not in url_completa.lower():
+            continue
+        if 'login' in url_completa.lower() or 'buyer/' in url_completa.lower():
+            continue
+
+        if re.search(r'-i\.\d+\.\d+', url_completa) or re.search(r'/i\.\d+\.\d+', url_completa):
+            bloco = _candidate_text(anchor.parent)
+            preco = ''
+            match_preco = re.search(r'R\$\s*\d{1,3}(?:\.\d{3})*,\d{2}', bloco)
+            if not match_preco:
+                match_preco = re.search(r'R\$\s*\d+(?:[\.,]\d{2})?', html_text or '')
+            if match_preco:
+                preco = _formatar_preco(match_preco.group(0))
+
+            imagem = ''
+            img_tag = anchor.find('img')
+            if not img_tag and anchor.parent is not None:
+                img_tag = anchor.parent.find('img')
+            if img_tag:
+                imagem = (img_tag.get('src') or img_tag.get('data-src') or img_tag.get('data-original') or '').strip()
+                if imagem:
+                    imagem = urljoin(base_url, imagem)
+
+            return {
+                'titulo': texto,
+                'preco_atual': preco,
+                'preco_original': '',
+                'imagem': imagem,
+                'link_afiliado': url_completa,
+            }
+
+    return {}
+
+
+def _extrair_mercadolivre_por_html(soup, html_text, base_url):
+    for anchor in soup.select('a[href]'):
+        href = anchor.get('href') or ''
+        url_completa = urljoin(base_url, href)
+        url_lower = url_completa.lower()
+        if 'mercadolivre.com.br' not in url_lower:
+            continue
+        if 'login' in url_lower or '/social/' in url_lower:
+            continue
+        if 'mlb' not in url_lower:
+            continue
+
+        texto = _candidate_text(anchor)
+        if not texto or len(texto) < 16:
+            continue
+
+        bloco = _candidate_text(anchor.parent)
+        if not bloco:
+            bloco = html_text or ''
+
+        preco_atual = ''
+        preco_original = ''
+        match_atual = re.search(r'(?:Agora|Preço atual|Por apenas)[:\s]*\[?R?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+(?:[\.,]\d{2})?)', bloco, flags=re.IGNORECASE)
+        match_original = re.search(r'(?:Antes|De|Preço de)[:\s]*\[?R?\$?\s*(\d{1,3}(?:\.\d{3})*,\d{2}|\d+(?:[\.,]\d{2})?)', bloco, flags=re.IGNORECASE)
+
+        if match_atual:
+            preco_atual = _formatar_preco(match_atual.group(1))
+        if match_original:
+            preco_original = _formatar_preco(match_original.group(1))
+
+        if not preco_atual:
+            price_match = re.search(r'\bR\$\s*\d{1,3}(?:\.\d{3})*,\d{2}\b', bloco)
+            if price_match:
+                preco_atual = _formatar_preco(price_match.group(0))
+
+        imagem = ''
+        img_tag = anchor.find('img')
+        if not img_tag and anchor.parent is not None:
+            img_tag = anchor.parent.find('img')
+        if img_tag:
+            imagem = (img_tag.get('src') or img_tag.get('data-src') or img_tag.get('data-original') or '').strip()
+            if imagem:
+                imagem = urljoin(base_url, imagem)
+
+        return {
+            'titulo': texto,
+            'preco_atual': preco_atual,
+            'preco_original': preco_original,
+            'imagem': imagem,
+            'link_afiliado': url_completa,
+        }
+
+    return {}
+
+
 def extrair_dados_produto(product_url):
     product_url = _normalize_url(product_url)
     if not product_url:
@@ -896,6 +1019,12 @@ def extrair_dados_produto(product_url):
             html_text = ''
 
     soup = BeautifulSoup(html_text or '', 'lxml')
+
+    if not shopee_dados and 'shopee' in host:
+        shopee_dados = _extrair_shopee_por_html(soup, html_text, final_url or product_url)
+
+    if not shopee_dados and 'mercadolivre' in host:
+        shopee_dados = _extrair_mercadolivre_por_html(soup, html_text, final_url or product_url)
 
     titulo = _extract_title_from_html(soup)
     imagem = _extract_image_from_html(soup, final_url)
@@ -985,7 +1114,7 @@ def extrair_dados_produto(product_url):
         'preco_atual': preco_atual_fmt,
         'preco_original': preco_original_fmt,
         'imagem': imagem,
-        'link_afiliado': final_url or product_url,
+        'link_afiliado': product_url,
         'loja_nome': loja_meta['nome'],
         'loja_simbolo': loja_meta['simbolo'],
         'loja_slug': loja_meta['slug'],

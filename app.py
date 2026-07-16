@@ -5,6 +5,9 @@ Interface web para geração de flyers promocionais
 from flask import Flask, render_template, request, send_file, flash, redirect, url_for, jsonify, abort
 import os
 import json
+import time
+import hmac
+import hashlib
 from datetime import datetime, timedelta
 import pytz
 import re
@@ -56,6 +59,11 @@ SHOPEE_GRAPHQL_URL = os.getenv('SHOPEE_GRAPHQL_URL', '').strip()
 SHOPEE_APP_ID = os.getenv('SHOPEE_APP_ID', '').strip()
 SHOPEE_APP_SECRET = os.getenv('SHOPEE_APP_SECRET', '').strip()
 SHOPEE_GRAPHQL_QUERY = os.getenv('SHOPEE_GRAPHQL_QUERY', '').strip()
+SHOPEE_PARTNER_ID = os.getenv('SHOPEE_PARTNER_ID', '').strip()
+SHOPEE_PARTNER_KEY = os.getenv('SHOPEE_PARTNER_KEY', '').strip()
+SHOPEE_SHOP_ID = os.getenv('SHOPEE_SHOP_ID', '').strip()
+SHOPEE_ACCESS_TOKEN = os.getenv('SHOPEE_ACCESS_TOKEN', '').strip()
+SHOPEE_OPENAPI_HOST = os.getenv('SHOPEE_OPENAPI_HOST', 'https://partner.shopeemobile.com').strip()
 
 COUPONS_FILE = 'saved_coupons.json'
 ADMIN_COUPONS_FILE = 'saved_admin_coupons.json'
@@ -740,6 +748,117 @@ def _normalizar_valor_centavos_shopee(valor):
     return _format_preco_br(numero)
 
 
+def _shopee_openapi_habilitada():
+    return all([
+        SHOPEE_PARTNER_ID,
+        SHOPEE_PARTNER_KEY,
+        SHOPEE_SHOP_ID,
+        SHOPEE_ACCESS_TOKEN,
+    ])
+
+
+def _shopee_openapi_sign(path, timestamp):
+    base_string = f"{SHOPEE_PARTNER_ID}{path}{timestamp}{SHOPEE_ACCESS_TOKEN}{SHOPEE_SHOP_ID}"
+    return hmac.new(
+        SHOPEE_PARTNER_KEY.encode('utf-8'),
+        base_string.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def extrair_dados_shopee_openapi(product_url):
+    if not _shopee_openapi_habilitada():
+        return {}
+
+    _, itemid = _shopee_extrair_ids(product_url)
+    if not itemid:
+        return {}
+
+    path = '/api/v2/product/get_item_base_info'
+    timestamp = int(time.time())
+    sign = _shopee_openapi_sign(path, timestamp)
+
+    params = {
+        'partner_id': SHOPEE_PARTNER_ID,
+        'timestamp': timestamp,
+        'sign': sign,
+        'shop_id': SHOPEE_SHOP_ID,
+        'access_token': SHOPEE_ACCESS_TOKEN,
+    }
+    payload = {
+        'item_id_list': [int(itemid)],
+        'need_tax_info': False,
+        'need_complaint_policy': False,
+    }
+
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+            'AppleWebKit/537.36 (KHTML, like Gecko) '
+            'Chrome/126.0.0.0 Safari/537.36'
+        ),
+    }
+
+    try:
+        response = requests.post(
+            f"{SHOPEE_OPENAPI_HOST}{path}",
+            params=params,
+            json=payload,
+            headers=headers,
+            timeout=20,
+        )
+        response.raise_for_status()
+        data = response.json() if response.content else {}
+    except Exception:
+        return {}
+
+    response_data = data.get('response') if isinstance(data, dict) else {}
+    if not isinstance(response_data, dict):
+        response_data = {}
+
+    items = response_data.get('item_list') or []
+    if not isinstance(items, list) or not items:
+        return {}
+
+    item = items[0] if isinstance(items[0], dict) else {}
+    if not item:
+        return {}
+
+    titulo = _first_nonempty(item.get('item_name'), item.get('name'), item.get('title'))
+
+    image_obj = item.get('image') if isinstance(item.get('image'), dict) else {}
+    imagem = _first_nonempty(
+        image_obj.get('image_url_list') if isinstance(image_obj, dict) else '',
+        item.get('image'),
+        item.get('image_url'),
+    )
+
+    preco_atual = ''
+    preco_original = ''
+    price_info = item.get('price_info')
+    if isinstance(price_info, list) and price_info and isinstance(price_info[0], dict):
+        p0 = price_info[0]
+        preco_atual = _normalizar_preco_shopee(_first_nonempty(p0.get('current_price'), p0.get('price')))
+        preco_original = _normalizar_preco_shopee(_first_nonempty(p0.get('original_price'), p0.get('price_before_discount')))
+
+    if not preco_atual:
+        preco_atual = _normalizar_preco_shopee(_first_nonempty(item.get('price'), item.get('current_price')))
+    if not preco_original:
+        preco_original = _normalizar_preco_shopee(_first_nonempty(item.get('original_price'), item.get('price_before_discount')))
+
+    if not (titulo or imagem or preco_atual):
+        return {}
+
+    return {
+        'titulo': titulo,
+        'imagem': imagem,
+        'preco_atual': preco_atual,
+        'preco_original': preco_original,
+        'link_afiliado': product_url,
+    }
+
+
 def _extrair_dados_shopee_resposta(data, product_url):
     candidatos = []
 
@@ -1117,7 +1236,9 @@ def extrair_dados_produto(product_url):
     shopee_dados = {}
     host = (urlparse(final_url or product_url).netloc or '').lower()
     if 'shopee' in host:
-        shopee_dados = extrair_dados_shopee_graphql(final_url or product_url)
+        shopee_dados = extrair_dados_shopee_openapi(final_url or product_url)
+        if not shopee_dados:
+            shopee_dados = extrair_dados_shopee_graphql(final_url or product_url)
         if not shopee_dados:
             shopee_dados = extrair_dados_shopee_api(final_url or product_url)
 
@@ -1180,7 +1301,10 @@ def extrair_dados_produto(product_url):
                 if not titulo:
                     title_match = re.search(r'^Title:\s*(.+)$', jina_resp.text, flags=re.MULTILINE)
                     if title_match:
-                        titulo = title_match.group(1).strip()
+                        titulo_candidate = title_match.group(1).strip()
+                        bloqueados_jina = ('url source:', 'warning:', 'markdown content:')
+                        if titulo_candidate and not titulo_candidate.lower().startswith(bloqueados_jina):
+                            titulo = titulo_candidate
         except requests.RequestException:
             pass
 
@@ -1223,6 +1347,11 @@ def extrair_dados_produto(product_url):
                 titulo = titulo_alt
             else:
                 titulo = f'Produto {extrair_loja_nome(final_url or product_url)}'
+
+    if 'shopee' in host:
+        titulo_limpo = (titulo or '').strip().lower()
+        if titulo_limpo in {'produto shopee', 'oferta shopee', 'shopee brasil'} and not (preco_atual_fmt or imagem):
+            titulo = ''
 
     loja_meta = montar_meta_loja(final_url or product_url)
 
@@ -1656,11 +1785,25 @@ def extrair_promocao_por_link():
     except requests.RequestException as exc:
         return jsonify({'erro': f'Falha ao acessar URL: {exc}'}), 502
 
-    faltantes = [
-        campo for campo in ('titulo', 'preco_atual', 'imagem') if not (dados.get(campo) or '').strip()
-    ]
+    titulo_extraido = (dados.get('titulo') or '').strip()
+    titulo_generico = titulo_extraido.lower() in {'produto shopee', 'oferta shopee', 'shopee brasil'}
 
-    return jsonify({'ok': True, 'dados': dados, 'campos_faltantes': faltantes})
+    faltantes = []
+    if not titulo_extraido or titulo_generico:
+        faltantes.append('titulo')
+    if not (dados.get('preco_atual') or '').strip():
+        faltantes.append('preco_atual')
+    if not (dados.get('imagem') or '').strip():
+        faltantes.append('imagem')
+
+    aviso = ''
+    host = (urlparse(product_url).netloc or '').lower()
+    if 'shopee' in host and faltantes:
+        aviso = (
+            'Shopee bloqueou extração automática neste link. '
+            'Use URL completa do produto ou configure SHOPEE_PARTNER_ID/SHOPEE_PARTNER_KEY/SHOPEE_SHOP_ID/SHOPEE_ACCESS_TOKEN para OpenAPI.'
+        )
+    return jsonify({'ok': True, 'dados': dados, 'campos_faltantes': faltantes, 'aviso': aviso})
 
 
 @app.route('/api/admin/promocoes/<int:promocao_id>', methods=['DELETE'])

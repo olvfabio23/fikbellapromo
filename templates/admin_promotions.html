@@ -630,6 +630,11 @@
 
             applyCouponPreview();
 
+            if (data.aviso) {
+                setMsg(data.aviso);
+                return;
+            }
+
             if (Array.isArray(data.campos_faltantes) && data.campos_faltantes.length) {
                 setMsg('Extraido parcialmente. Complete os campos: ' + data.campos_faltantes.join(', '));
             } else if (!lojaTexto) {
